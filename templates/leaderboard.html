@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Goita Online - Leaderboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 50%; margin-top: 20px; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+
+    <h2>Goita Leaderboard</h2>
+    
+    <input type="text" id="searchInput" placeholder="Search username..." onkeyup="fetchLeaderboard()">
+
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Username</th>
+                <th>Wins</th>
+                <th>Losses</th>
+                <th>Win Rate</th>
+            </tr>
+        </thead>
+        <tbody id="leaderboardBody">
+            </tbody>
+    </table>
+
+    <script>
+        // This function calls your Python API!
+        async function fetchLeaderboard() {
+            const searchQuery = document.getElementById('searchInput').value;
+            
+            // Hit the API endpoint you just built
+            const response = await fetch(`/api/leaderboard?search=${searchQuery}`);
+            const data = await response.json();
+            
+            const tbody = document.getElementById('leaderboardBody');
+            tbody.innerHTML = ''; // Clear the old data
+            
+            // Loop through the JSON data and create table rows
+            data.forEach(player => {
+                const row = `<tr>
+                    <td>${player.rank}</td>
+                    <td>${player.username}</td>
+                    <td>${player.wins}</td>
+                    <td>${player.losses}</td>
+                    <td>${player.win_rate}%</td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+
+        // Load the top 50 players as soon as the page opens
+        window.onload = fetchLeaderboard;
+    </script>
+
+</body>
+</html>
