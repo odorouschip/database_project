@@ -22,10 +22,8 @@
         </div>
 
     <script>
-        // Fake a logged-in user for now (Role 1 will handle real logins later)
         const myPlayerId = 3;
 
-        // 1. ADD DATA: Create a new game room
         async function createGame() {
             const response = await fetch('/api/create_game', {
                 method: 'POST',
@@ -36,18 +34,16 @@
             const data = await response.json();
             const statusText = document.getElementById('statusMessage');
 
-            // Now the frontend actually listens to the backend bouncer!
             if (data.status === "error") {
                 statusText.className = "error";
                 statusText.innerText = data.message;
             } else {
                 statusText.className = "";
                 statusText.innerText = "Game Created! ID: " + data.game_id;
-                fetchOpenGames(); // Refresh the list instantly
+                fetchOpenGames(); 
             }
         }
 
-        // 2. RETRIEVE DATA: Get waiting games
         async function fetchOpenGames() {
             const response = await fetch('/api/open_games');
             const games = await response.json();
@@ -56,17 +52,14 @@
             container.innerHTML = ''; 
             
             games.forEach(game => {
-                // Check if the players string exists, then turn it into an array
                 const currentPlayers = game.players ? game.players.split(',') : [];
                 const isAlreadyInLobby = currentPlayers.includes(myPlayerId.toString());
                 
                 let buttonHtml = "";
                 
                 if (isAlreadyInLobby) {
-                    // Change the button if they are already in this room
                     buttonHtml = `<button disabled style="background-color: gray; color: white;">Waiting for players...</button>`;
                 } else {
-                    // Show standard join button if they are not in this room
                     buttonHtml = `<button onclick="joinGame(${game.game_id})">Join Game</button>`;
                 }
 
@@ -80,12 +73,10 @@
             });
         }
 
-        // 3. CONCURRENCY & UPDATE: Join a room
         async function joinGame(gameId) {
             const response = await fetch('/api/join_game', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // Notice we removed the hardcoded seat_position!
                 body: JSON.stringify({ game_id: gameId, player_id: myPlayerId })
             });
             
@@ -98,11 +89,9 @@
             } else {
                 statusText.className = "";
                 statusText.innerText = data.message;
-                // Instantly refresh the UI to show the new player count and gray out the button
                 fetchOpenGames(); 
             }
         }
-        // Load the open games when the page opens
         window.onload = fetchOpenGames;
     </script>
 
