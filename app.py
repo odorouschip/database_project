@@ -75,6 +75,10 @@ def create_account():
     
     username = data.get('username')
     password = data.get('password')
+    
+    if not ph.valid_password(password):
+        return jsonify({"status":"error", "message":"invalid password bypassed html"}), 400
+
     hashed_password = ph.hash_password(password)
 
     conn = get_db_connection()
