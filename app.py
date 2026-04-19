@@ -1,9 +1,11 @@
 import os
-from flask import Flask, request, jsonify, render_template
 import mysql.connector
+
+from class/password_handler import password_handler
+
 from mysql.connector import Error
 from dotenv import load_dotenv
-
+from flask import Flask, request, jsonify, render_template
 load_dotenv()
 
 app = Flask(__name__)
@@ -24,6 +26,37 @@ def get_db_connection():
 @app.route('/')
 def home():
     return "The Goita Online Backend is running successfully!"
+
+
+@app.route('/login')
+def show_login():
+    return render_template('login.html')
+
+@app.route('/api/login_button', methods=['POST'])
+def check_user():
+    data = request.json
+    ph = password_handler()
+
+    username = data.get('username')
+    password = data.get('password')
+    hashed_password = ph.hash_password(password)
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(""" SELECT 1 from USERS where username = %s AND password = %s LIMIT 1""", (username, hashed_password))
+    
+    valid = cursor.fetchone() is not None
+    
+    
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if valid:
+        return rediret(url_for('home'))
+
+    return jsonify({"status":"invalid"}), 401
 
 @app.route('/leaderboard')
 def show_leaderboard():
