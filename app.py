@@ -5,7 +5,7 @@ from classes.password_handler import password_handler
 
 from mysql.connector import Error
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, render_template, redirct, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 
 load_dotenv()
 
@@ -62,6 +62,9 @@ def check_user():
     cursor.close()
     conn.close()
     return jsonify({"status":"invalid"}), 401
+
+@app.route('/newuser')
+    return render_template('newuser.html')
 
 @app.route('/leaderboard')
 def show_leaderboard():
