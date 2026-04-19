@@ -1,11 +1,12 @@
 import os
 import mysql.connector
 
-from class/password_handler import password_handler
+from classes.password_handler import password_handler
 
 from mysql.connector import Error
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirct, url_for
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -44,18 +45,22 @@ def check_user():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute(""" SELECT 1 from USERS where username = %s AND password = %s LIMIT 1""", (username, hashed_password))
+    cursor.execute(""" SELECT 1 from Player where username = %s AND password = %s LIMIT 1""", (username, hashed_password))
     
     valid = cursor.fetchone() is not None
     
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
 
     if valid:
-        return rediret(url_for('home'))
+        cursor.execute(
+        "UPDATE Player SET last_login_time = NOW() WHERE username = %s",
+        (username,)
+        )
+        conn.commit()
+        return redirect(url_for('home'))
 
+    
+    cursor.close()
+    conn.close()
     return jsonify({"status":"invalid"}), 401
 
 @app.route('/leaderboard')
