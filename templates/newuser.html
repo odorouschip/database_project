@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Account</title>
+</head>
+<body>
+    <h2>Create Account</h2>
+
+    <h3>Password requirements</h3>
+    <ul id="requirements">
+        <li id="req-length">At least 8 characters</li>
+        <li id="req-letter">Contains a letter</li>
+        <li id="req-number">Contains a number</li>
+        <li id="req-upper">Contains an uppercase letter</li>
+        <li id="req-special">Contains a special character</li>
+    </ul>
+
+    <form id="createForm">
+        <input type="text" id="username" placeholder="Username" required>
+        <br><br>
+
+        <input type="password" id="password" placeholder="Password" required>
+        <br><br>
+
+        <input type="password" id="confirm" placeholder="Confirm Password" required>
+        <br><br>
+
+        <button type="submit">Create Account</button>
+    </form>
+
+    <p>
+        Already have an account?
+        <a href="/login">
+            <button type="button">Back to login</button>
+        </a>
+    </p>
+    <p id="error" style="color:red;"></p>
+
+    <script>
+        document.getElementById("createForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            const confirm  = document.getElementById("confirm").value;
+            const errorEl = document.getElementById("error");
+            errorEl.innerText = "";
+
+            if (password !== confirm) {
+                document.getElementById("error").innerText = "Passwords do not match";
+                return;
+            }
+
+            if (password.length < 8){
+                errorEl.innerText = "Password must be at least 8 characters";
+                return;
+            }
+
+            if (!/[a-zA-Z]/.test(password)){
+                errorEl.innerText = "Password must contain a letter";
+                return
+            }
+            if (!/[0-9]/.test(password)) {
+                errorEl.innerText = "Password must contain a number";
+                return;
+                }
+            if (!/[A-Z]/.test(password)) {
+                errorEl.innerText = "Password must contain an uppercase letter";
+                return;
+            }
+
+            if (!/[!@#$%^&*]/.test(password)) {
+                errorEl.innerText = "Password must contain a special character";
+                return;
+            }
+		
+	 
+            const res = await fetch("/api/create_account", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ username, password })
+            });
+		
+	    const data = await res.json();
+	    
+	    if (res.status === 409) {
+		document.getElementById("error").innerText = "Username already exists";
+		return;
+	    }
+	    
+	    if (res.status === 400){
+		document.getElementById("error").innerText = "Invalid password passed to backend. Do not do this again. Please try again."
+		return;
+	    }
+
+            if (res.ok) {
+                window.location.href = "/login?created=1";
+                return;
+            }
+
+            document.getElementById("error").innerText = "Failed to create account";
+        });
+    </script>
+</body>
+</html>

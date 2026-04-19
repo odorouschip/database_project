@@ -1,8 +1,12 @@
 import os
-from flask import Flask, request, jsonify, render_template
 import mysql.connector
+
+from classes.password_handler import password_handler
+
 from mysql.connector import Error
+from mysql.connector.errors import IntegrityError
 from dotenv import load_dotenv
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 
 load_dotenv()
 
@@ -24,6 +28,74 @@ def get_db_connection():
 @app.route('/')
 def home():
     return "The Goita Online Backend is running successfully!"
+
+
+@app.route('/login')
+def show_login():
+    return render_template('login.html')
+
+@app.route('/api/login_button', methods=['POST'])
+def check_user():
+    data = request.json
+    ph = password_handler()
+
+    username = data.get('username')
+    password = data.get('password')
+    hashed_password = ph.hash_password(password)
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(""" SELECT 1 from Player where username = %s AND password = %s LIMIT 1""", (username, hashed_password))
+    
+    valid = cursor.fetchone() is not None
+    
+
+    if valid:
+        cursor.execute(
+        "UPDATE Player SET last_login_time = NOW() WHERE username = %s",
+        (username,)
+        )
+        conn.commit()
+        return redirect(url_for('home'))
+
+    
+    cursor.close()
+    conn.close()
+    return jsonify({"status":"invalid"}), 401
+
+@app.route('/newuser')
+def show_newuser():
+    return render_template('newuser.html')
+
+@app.route('/api/create_account', methods=['POST'])
+def create_account():
+    data = request.json
+    ph = password_handler()
+    
+    username = data.get('username')
+    password = data.get('password')
+    
+    if not ph.valid_password(password):
+        return jsonify({"status":"error", "message":"invalid password bypassed html"}), 400
+
+    hashed_password = ph.hash_password(password)
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(""" INSERT INTO Player (username, password) VALUES (%s, %s)""", (username, hashed_password))
+        conn.commit()
+
+    except IntegrityError:
+        cursor.close()
+        conn.close()
+        return jsonify({"status":"exists"}), 409
+
+    cursor.close()
+    conn.close()
+    return jsonify({"status":"success"}), 201
 
 @app.route('/leaderboard')
 def show_leaderboard():
