@@ -4,6 +4,7 @@ import mysql.connector
 from classes.password_handler import password_handler
 
 from mysql.connector import Error
+from mysql.connector.errors import IntegrityError
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template, redirect, url_for
 
@@ -41,7 +42,7 @@ def check_user():
     username = data.get('username')
     password = data.get('password')
     hashed_password = ph.hash_password(password)
-    
+        
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -64,7 +65,33 @@ def check_user():
     return jsonify({"status":"invalid"}), 401
 
 @app.route('/newuser')
+def show_newuser():
     return render_template('newuser.html')
+
+@app.route('/api/create_account', methods=['POST'])
+def create_account():
+    data = request.json
+    ph = password_handler()
+    
+    username = data.get('username')
+    password = data.get('password')
+    hashed_password = ph.hash_password(password)
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(""" INSERT INTO Player (username, password) VALUES (%s, %s)""", (username, hashed_password))
+        conn.commit()
+
+    except IntegrityError:
+        cursor.close()
+        conn.close()
+        return jsonify({"status":"exists"}), 409
+
+    cursor.close()
+    conn.close()
+    return jsonify({"status":"success"}), 201
 
 @app.route('/leaderboard')
 def show_leaderboard():

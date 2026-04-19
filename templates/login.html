@@ -15,6 +15,15 @@
     </form>
 
     <p id="error" style="color:red;"></p>
+    <p id="message" style="color:green;"></p>
+
+    <script>
+	    const params = new URLSearchParams(window.location.search);
+	    if (params.get("created") === "1") {
+		document.getElementById("message").innerText = 
+			    "Account created successfully, login now!";
+	    }
+    </script>
 
     <script>
         document.getElementById("loginForm").addEventListener("submit", async function(e) {
