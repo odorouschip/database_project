@@ -46,21 +46,6 @@ export function PlayerTurnScreen({
       : { mode: 'defense', defenseId: null, newAttackId: null }
   );
 
-  // Auto-select when only 2 tiles remain
-  useEffect(() => {
-    if (hand.length === 2) {
-      if (isAttackMode) {
-        setSel({ mode: 'attack', shogunId: hand[0]!.id, attackId: hand[1]!.id });
-      } else if (legalDefenders.length >= 1) {
-        const defTile = legalDefenders[0]!;
-        const otherTile = hand.find(t => t.id !== defTile.id);
-        if (otherTile) {
-          setSel({ mode: 'defense', defenseId: defTile.id, newAttackId: otherTile.id });
-        }
-      }
-    }
-  }, [hand.length, isAttackMode, legalDefenders.length]);
-
   const handleTileClick = (tileId: number) => {
     if (sel.mode === 'attack') {
       if (tileId === sel.shogunId) { setSel({ ...sel, shogunId: null }); return; }
@@ -112,7 +97,6 @@ export function PlayerTurnScreen({
           <span className="score-team score-a">{teamScores.A}</span>
           <span className="score-sep">/</span>
           <span className="score-team score-b">{teamScores.B}</span>
-          {/* <span className="score-sep">·</span> */}
           <span className="score-target">First to 150</span>
         </div>
       </div>
