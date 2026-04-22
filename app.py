@@ -27,8 +27,18 @@ def get_db_connection():
         print(f"Error connecting to MySQL: {e}")
         return None
 
+def logged_in():
+    if 'player_id' not in session:
+        return False
+    return True
+def redirect_to_login():
+    return redirect(url_for('show_login'))
+
 @app.route('/')
 def home():
+    if not logged_in():
+        return redirect_to_login()
+
     return f"The Goita Online Backend is running successfully! {session['username']} is logged in."
 
 
@@ -63,7 +73,7 @@ def check_user():
         )
         conn.commit()
 
-        session['user_id'] = player_id
+        session['player_id'] = player_id
         session['username'] = username
         return redirect(url_for('home'))
 
@@ -107,10 +117,16 @@ def create_account():
 
 @app.route('/leaderboard')
 def show_leaderboard():
+    if not logged_in():
+        return redirect_to_login()
+
     return render_template('leaderboard.html')
 
 @app.route('/matchmaking')
 def show_matchmaking():
+    if not logged_in():
+        return redirect_to_login()
+
     return render_template('matchmaking.html')
 
 @app.route('/api/leaderboard', methods=['GET'])
