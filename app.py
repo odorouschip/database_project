@@ -6,12 +6,14 @@ from classes.password_handler import password_handler
 from mysql.connector import Error
 from mysql.connector.errors import IntegrityError
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 
 load_dotenv()
 
 app = Flask(__name__)
-
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+if not app.secret_key:
+    raise RuntimeError("FLASK_SECRET_KEY not set. please set in .env for session control")
 def get_db_connection():
     try:
         connection = mysql.connector.connect(
@@ -25,9 +27,19 @@ def get_db_connection():
         print(f"Error connecting to MySQL: {e}")
         return None
 
+def logged_in():
+    if 'player_id' not in session:
+        return False
+    return True
+def redirect_to_login():
+    return redirect(url_for('show_login'))
+
 @app.route('/')
 def home():
-    return "The Goita Online Backend is running successfully!"
+    if not logged_in():
+        return redirect_to_login()
+
+    return f"The Goita Online Backend is running successfully! {session['username']} is logged in."
 
 
 @app.route('/login')
@@ -46,17 +58,23 @@ def check_user():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute(""" SELECT 1 from Player where username = %s AND password = %s LIMIT 1""", (username, hashed_password))
+    cursor.execute(""" SELECT player_id, username from Player where username = %s AND password = %s LIMIT 1""", (username, hashed_password))
     
-    valid = cursor.fetchone() is not None
-    
+    row = cursor.fetchone()
+    print(row)
+    valid = row is not None
 
     if valid:
+        player_id = row[0]
+        username = row[1]
         cursor.execute(
         "UPDATE Player SET last_login_time = NOW() WHERE username = %s",
         (username,)
         )
         conn.commit()
+
+        session['player_id'] = player_id
+        session['username'] = username
         return redirect(url_for('home'))
 
     
@@ -99,10 +117,16 @@ def create_account():
 
 @app.route('/leaderboard')
 def show_leaderboard():
+    if not logged_in():
+        return redirect_to_login()
+
     return render_template('leaderboard.html')
 
 @app.route('/matchmaking')
 def show_matchmaking():
+    if not logged_in():
+        return redirect_to_login()
+
     return render_template('matchmaking.html')
 
 @app.route('/api/leaderboard', methods=['GET'])
