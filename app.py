@@ -14,6 +14,7 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 if not app.secret_key:
     raise RuntimeError("FLASK_SECRET_KEY not set. please set in .env for session control")
+
 def get_db_connection():
     try:
         connection = mysql.connector.connect(
@@ -31,6 +32,7 @@ def logged_in():
     if 'player_id' not in session:
         return False
     return True
+
 def redirect_to_login():
     return redirect(url_for('show_login'))
 
@@ -114,6 +116,106 @@ def create_account():
     cursor.close()
     conn.close()
     return jsonify({"status":"success"}), 201
+
+@app.route('/account')
+def show_account_information():
+    if not logged_in():
+        return redirect_to_login()
+
+    return render_template('account.html')
+
+@app.route('/api/account', methods=['GET'])
+def display_current_user():
+    if not logged_in():
+        return jsonify({'logged_in':False}), 200
+
+    return jsonify({"logged_in":True, "player_id":session["player_id"], "username":session["username"]})
+
+@app.route('/api/delete_account',methods=['POST'])
+def delete_account():
+    player_id = session['player_id']
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM Player WHERE player_id = %s", (player_id,))
+    conn.commit()
+    session.clear()
+    cursor.close()
+    conn.close()
+
+    return jsonify({"status":"success"}), 200
+
+@app.route('/api/change_password', methods=['POST'])
+def change_password():
+
+    data = request.json
+    ph = password_handler()
+    
+    new_password = data.get('password')
+
+    if not new_password:
+        return jsonify({
+            "status": "error",
+            "message": "Password is required."
+        }), 400
+
+    if not ph.valid_password(new_password):
+        return jsonify({
+            "status": "error",
+            "message": "Password does not meet requirements."
+        }), 400
+
+    hashed_new_password = ph.hash_password(new_password)
+    player_id = session.get('player_id')
+
+    conn = get_db_connection()
+    
+    cursor = conn.cursor()
+
+    cursor.execute("""UPDATE Player SET password = %s WHERE player_id = %s""", (hashed_new_password, player_id))
+    conn.commit()
+    
+    cursor.close()
+    conn.close()
+
+    return jsonify({"status": "success"}, {"message":"password changed successfully,"}), 200
+
+@app.route('/api/change_username', methods=['POST'])
+def change_username():
+    data = request.json
+    new_username = data.get('username')
+
+    if not new_username:
+        return jsonify({"status":"error", "message":"Username is required."}),400
+
+    player_id = session.get('player_id')
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("""UPDATE Player SET username = %s WHERE player_id = %s """, (new_username, player_id))
+        conn.commit()
+
+        session['username'] = new_username
+    
+    except IntegrityError:
+        conn.rollback()
+        return jsonify({"status":"error", "message": "Username already exists"}), 409
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({"status":"success", "message":"Username changed successfully."}), 200
+
+@app.route('/api/logout', methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"status":"success"}), 200
+
+    
+
 
 @app.route('/leaderboard')
 def show_leaderboard():

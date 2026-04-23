@@ -23,6 +23,15 @@
 		document.getElementById("message").innerText = 
 			    "Account created successfully, login now!";
 	    }
+        if (params.get("deleted") === "1"){
+            document.getElementById("message").innerText =
+                "Account deleted successfully, please log in or create an account now!";
+        }
+        if (params.get("logout") === "1"){
+            document.getElementById("message").innerText =
+                "Logged out successfully."
+        }
+
     </script>
 
     <script>
