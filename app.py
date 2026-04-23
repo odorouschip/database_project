@@ -14,6 +14,7 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 if not app.secret_key:
     raise RuntimeError("FLASK_SECRET_KEY not set. please set in .env for session control")
+
 def get_db_connection():
     try:
         connection = mysql.connector.connect(
@@ -31,6 +32,7 @@ def logged_in():
     if 'player_id' not in session:
         return False
     return True
+
 def redirect_to_login():
     return redirect(url_for('show_login'))
 
@@ -178,6 +180,42 @@ def change_password():
     conn.close()
 
     return jsonify({"status": "success"}, {"message":"password changed successfully,"}), 200
+
+@app.route('/api/change_username', methods=['POST'])
+def change_username():
+    data = request.json
+    new_username = data.get('username')
+
+    if not new_username:
+        return jsonify({"status":"error", "message":"Username is required."}),400
+
+    player_id = session.get('player_id')
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("""UPDATE Player SET username = %s WHERE player_id = %s """, (new_username, player_id))
+        conn.commit()
+
+        session['username'] = new_username
+    
+    except IntegrityError:
+        conn.rollback()
+        return jsonify({"status":"error", "message": "Username already exists"}), 409
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({"status":"success", "message":"Username changed successfully."}), 200
+
+@app.route('/api/logout', methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"status":"success"}), 200
+
+    
+
 
 @app.route('/leaderboard')
 def show_leaderboard():

@@ -69,6 +69,10 @@
     <button id="deleteAccountButton">
         Delete Account
     </button>
+    
+    <button id="logoutButton">
+        Logout
+    </button>
 
     <p id="error" style="color:red;"></p>
     <p id="message" style="color:green;"></p>
@@ -234,6 +238,26 @@
 
                 document.getElementById("error").innerText =
                     data.message || "Failed to delete account.";
+            }
+        );
+
+        document.getElementById("logoutButton").addEventListener(
+            "click",
+            async function () {
+                const res = await fetch("/api/logout", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+
+                if (res.ok) {
+                    window.location.href = "/login?logout=1";
+                    return;
+                }
+
+                document.getElementById("error").innerText =
+                    "Failed to log out.";
             }
         );
 
