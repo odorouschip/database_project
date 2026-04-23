@@ -144,7 +144,40 @@ def delete_account():
 
     return jsonify({"status":"success"}), 200
 
+@app.route('/api/change_password', methods=['POST'])
+def change_password():
 
+    data = request.json
+    ph = password_handler()
+    
+    new_password = data.get('password')
+
+    if not new_password:
+        return jsonify({
+            "status": "error",
+            "message": "Password is required."
+        }), 400
+
+    if not ph.valid_password(new_password):
+        return jsonify({
+            "status": "error",
+            "message": "Password does not meet requirements."
+        }), 400
+
+    hashed_new_password = ph.hash_password(new_password)
+    player_id = session.get('player_id')
+
+    conn = get_db_connection()
+    
+    cursor = conn.cursor()
+
+    cursor.execute("""UPDATE Player SET password = %s WHERE player_id = %s""", (hashed_new_password, player_id))
+    conn.commit()
+    
+    cursor.close()
+    conn.close()
+
+    return jsonify({"status": "success"}, {"message":"password changed successfully,"}), 200
 
 @app.route('/leaderboard')
 def show_leaderboard():

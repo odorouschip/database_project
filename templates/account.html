@@ -12,15 +12,57 @@
 
     <br>
 
-    <button onclick="window.location.href='/change_username'">
+    <button id="showUsernameFormButton">
         Change Username
     </button>
 
+    <div id="usernameFormContainer" style="display:none; margin-top:12px;">
+        <input
+            type="text"
+            id="newUsername"
+            placeholder="Enter new username"
+            required
+        >
+        <button id="submitUsernameChange">
+            Submit Username Change
+        </button>
+    </div>
+
     <br><br>
 
-    <button onclick="window.location.href='/change_password'">
+    <button id="showPasswordFormButton">
         Change Password
     </button>
+
+    <div id="passwordFormContainer" style="display:none; margin-top:12px;">
+        <ul style="margin-bottom:10px;">
+            <li>At least 8 characters</li>
+            <li>Contains an uppercase letter</li>
+            <li>Contains a lowercase letter</li>
+            <li>Contains a number</li>
+            <li>Contains a special character</li>
+        </ul>
+
+        <input
+            type="password"
+            id="newPassword"
+            placeholder="Enter new password"
+            required
+        >
+        <br><br>
+
+        <input
+            type="password"
+            id="confirmPassword"
+            placeholder="Confirm new password"
+            required
+        >
+        <br><br>
+
+        <button id="submitPasswordChange">
+            Submit Password Change
+        </button>
+    </div>
 
     <br><br>
 
@@ -56,6 +98,114 @@
             document.getElementById("usernameDisplay").innerText =
                 data.username;
         }
+
+        document.getElementById("showUsernameFormButton").addEventListener(
+            "click",
+            function () {
+                const form = document.getElementById("usernameFormContainer");
+                form.style.display =
+                    form.style.display === "none" ? "block" : "none";
+            }
+        );
+
+        document.getElementById("showPasswordFormButton").addEventListener(
+            "click",
+            function () {
+                const form = document.getElementById("passwordFormContainer");
+                form.style.display =
+                    form.style.display === "none" ? "block" : "none";
+            }
+        );
+
+        document.getElementById("submitUsernameChange").addEventListener(
+            "click",
+            async function () {
+                document.getElementById("error").innerText = "";
+                document.getElementById("message").innerText = "";
+
+                const newUsername =
+                    document.getElementById("newUsername").value;
+
+                const res = await fetch("/api/change_username", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ username: newUsername })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    document.getElementById("message").innerText =
+                        "Username changed successfully.";
+                    document.getElementById("usernameDisplay").innerText =
+                        newUsername;
+                    document.getElementById("newUsername").value = "";
+                    document.getElementById("usernameFormContainer").style.display =
+                        "none";
+                    return;
+                }
+
+                document.getElementById("error").innerText =
+                    data.message || "Failed to change username.";
+            }
+        );
+
+        document.getElementById("submitPasswordChange").addEventListener(
+            "click",
+            async function () {
+                document.getElementById("error").innerText = "";
+                document.getElementById("message").innerText = "";
+
+                const password =
+                    document.getElementById("newPassword").value;
+                const confirm =
+                    document.getElementById("confirmPassword").value;
+
+                if (password !== confirm) {
+                    document.getElementById("error").innerText =
+                        "Passwords do not match.";
+                    return;
+                }
+
+                const valid =
+                    password.length >= 8 &&
+                    /[A-Z]/.test(password) &&
+                    /[a-z]/.test(password) &&
+                    /[0-9]/.test(password) &&
+                    /[^A-Za-z0-9]/.test(password);
+
+                if (!valid) {
+                    document.getElementById("error").innerText =
+                        "Password does not meet requirements.";
+                    return;
+                }
+
+                const res = await fetch("/api/change_password", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ password: password })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    document.getElementById("message").innerText =
+                        "Password changed successfully.";
+                    document.getElementById("newPassword").value = "";
+                    document.getElementById("confirmPassword").value = "";
+                    document.getElementById("passwordFormContainer").style.display =
+                        "none";
+                    return;
+                }
+
+                document.getElementById("error").innerText =
+                    data.message || "Failed to change password.";
+            }
+        );
 
         document.getElementById("deleteAccountButton").addEventListener(
             "click",
