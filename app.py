@@ -115,6 +115,37 @@ def create_account():
     conn.close()
     return jsonify({"status":"success"}), 201
 
+@app.route('/account')
+def show_account_information():
+    if not logged_in():
+        return redirect_to_login()
+
+    return render_template('account.html')
+
+@app.route('/api/account', methods=['GET'])
+def display_current_user():
+    if not logged_in():
+        return jsonify({'logged_in':False}), 200
+
+    return jsonify({"logged_in":True, "player_id":session["player_id"], "username":session["username"]})
+
+@app.route('/api/delete_account',methods=['POST'])
+def delete_account():
+    player_id = session['player_id']
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM Player WHERE player_id = %s", (player_id,))
+    conn.commit()
+    session.clear()
+    cursor.close()
+    conn.close()
+
+    return jsonify({"status":"success"}), 200
+
+
+
 @app.route('/leaderboard')
 def show_leaderboard():
     if not logged_in():

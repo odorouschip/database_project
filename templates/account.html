@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Account</title>
+</head>
+<body>
+    <h2>Account</h2>
+
+    <p>
+        Logged in as: <span id="usernameDisplay">Loading...</span>
+    </p>
+
+    <br>
+
+    <button onclick="window.location.href='/change_username'">
+        Change Username
+    </button>
+
+    <br><br>
+
+    <button onclick="window.location.href='/change_password'">
+        Change Password
+    </button>
+
+    <br><br>
+
+    <button id="deleteAccountButton">
+        Delete Account
+    </button>
+
+    <p id="error" style="color:red;"></p>
+    <p id="message" style="color:green;"></p>
+
+    <script>
+        async function loadAccountInfo() {
+            const res = await fetch("/api/account", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+
+            if (!res.ok) {
+                document.getElementById("error").innerText =
+                    "Could not load account info.";
+                return;
+            }
+
+            const data = await res.json();
+
+            if (!data.logged_in) {
+                window.location.href = "/login";
+                return;
+            }
+
+            document.getElementById("usernameDisplay").innerText =
+                data.username;
+        }
+
+        document.getElementById("deleteAccountButton").addEventListener(
+            "click",
+            async function () {
+                const confirmed = confirm(
+                    "Are you sure you want to delete your account?"
+                );
+
+                if (!confirmed) {
+                    return;
+                }
+
+                const res = await fetch("/api/delete_account", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    window.location.href = "/login?deleted=1";
+                    return;
+                }
+
+                document.getElementById("error").innerText =
+                    data.message || "Failed to delete account.";
+            }
+        );
+
+        loadAccountInfo();
+    </script>
+</body>
+</html>
