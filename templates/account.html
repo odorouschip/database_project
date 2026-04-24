@@ -77,6 +77,9 @@
     <p id="error" style="color:red;"></p>
     <p id="message" style="color:green;"></p>
 
+    <h3 style="margin-top:24px;">Past Matches</h3>
+    <div id="pastMatchesContainer">Loading...</div>
+
     <script>
         async function loadAccountInfo() {
             const res = await fetch("/api/account", {
@@ -261,7 +264,46 @@
             }
         );
 
+        async function loadPastMatches() {
+            const container = document.getElementById("pastMatchesContainer");
+
+            const res = await fetch("/api/past_matches");
+            if (!res.ok) {
+                container.innerText = "Could not load past matches.";
+                return;
+            }
+
+            const matches = await res.json();
+
+            if (matches.length === 0) {
+                container.innerText = "No past matches yet.";
+                return;
+            }
+
+            container.innerHTML = "";
+            matches.forEach(function (m) {
+                const dateStr = m.ended_time ? m.ended_time.split("T")[0] : "";
+                const opponentNames = m.opponents
+                    .map(function (o) { return o.username; })
+                    .join(", ");
+
+                const row = document.createElement("div");
+                row.style.border = "1px solid #ccc";
+                row.style.padding = "8px";
+                row.style.marginBottom = "6px";
+                row.innerHTML =
+                    "<strong>vs " + opponentNames + "</strong>" +
+                    " &nbsp; " + dateStr +
+                    " &nbsp; " + m.my_score + "-" + m.opp_score +
+                    " &nbsp; <span style='color:" +
+                    (m.result === "Win" ? "green" : "red") + ";'>" +
+                    m.result + "</span>";
+                container.appendChild(row);
+            });
+        }
+
         loadAccountInfo();
+        loadPastMatches();
     </script>
 </body>
 </html>

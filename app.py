@@ -355,5 +355,60 @@ def join_game():
         
     return jsonify(response)
 
+@app.route('/api/past_matches', methods=['GET'])
+def get_past_matches():
+    if not logged_in():
+        return jsonify({"error": "Not logged in"}), 401
+
+    pid = session['player_id']
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database connection failed"}), 500
+
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT
+            g.game_id,
+            g.ended_time,
+            g.winning_team_number,
+            gp.seat_position,
+            CASE WHEN gp.seat_position IN (1,3) THEN 1 ELSE 2 END AS my_team_number,
+            t_mine.score AS my_score,
+            t_opp.score AS opp_score,
+            CASE
+                WHEN g.winning_team_number =
+                    (CASE WHEN gp.seat_position IN (1,3) THEN 1 ELSE 2 END)
+                THEN 'Win' ELSE 'Loss'
+            END AS result
+        FROM Game g
+        JOIN Game_Player gp ON g.game_id = gp.game_id
+        JOIN Team t_mine ON t_mine.game_id = g.game_id
+            AND t_mine.team_number = (CASE WHEN gp.seat_position IN (1,3) THEN 1 ELSE 2 END)
+        JOIN Team t_opp ON t_opp.game_id = g.game_id
+            AND t_opp.team_number = (CASE WHEN gp.seat_position IN (1,3) THEN 2 ELSE 1 END)
+        WHERE gp.player_id = %s AND g.status = 'completed'
+        ORDER BY g.ended_time DESC
+    """, (pid,))
+
+    matches = cursor.fetchall()
+
+    for m in matches:
+        cursor.execute("""
+            SELECT p.username, gp.seat_position
+            FROM Game_Player gp
+            JOIN Player p ON p.player_id = gp.player_id
+            WHERE gp.game_id = %s AND gp.player_id != %s
+            ORDER BY gp.seat_position
+        """, (m['game_id'], pid))
+        m['opponents'] = cursor.fetchall()
+        if m['ended_time']:
+            m['ended_time'] = m['ended_time'].isoformat()
+
+    cursor.close()
+    conn.close()
+    return jsonify(matches)
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
