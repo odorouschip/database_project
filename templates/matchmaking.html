@@ -4,95 +4,170 @@
     <title>Goita Online - Matchmaking</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
-        .lobby-box { border: 1px solid #ccc; padding: 15px; margin: 10px 0; width: 300px; }
+        .lobby-box { border: 1px solid #ccc; padding: 15px; margin: 10px 0; max-width: 420px; border-radius: 8px; }
+        .lobby-box.mine { border-color: #2e7d32; background: #f1f8e9; }
+        .lobby-box .teams { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
+        .team-pill {
+            display: inline-block;
+            padding: 6px 10px;
+            background: #eee;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .team-pill.t1 { background: #e3f2fd; }
+        .team-pill.t2 { background: #fce4ec; }
         button { padding: 10px; cursor: pointer; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         #createBtn { background-color: #4CAF50; color: white; border: none; font-weight: bold; }
+        .join-t1 { background: #1976d2; color: #fff; border: none; }
+        .join-t2 { background: #c2185b; color: #fff; border: none; }
         .error { color: red; font-weight: bold; }
+        .muted { color: #666; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <h2>Matchmaking Hub</h2>
-    
-    <button id="createBtn" onclick="createGame()">+ Create New Game</button>
+    <h2>Matchmaking</h2>
+    <p class="muted">Team 1: seats 1 &amp; 3 — Team 2: seats 2 &amp; 4. Choose a team when you join an open lobby.</p>
+
+    <button type="button" id="createBtn">+ Create new game</button>
     <p id="statusMessage"></p>
 
-    <h3>Open Lobbies</h3>
-    <div id="lobbiesContainer">
-        </div>
+    <h3>Open lobbies</h3>
+    <div id="lobbiesContainer"></div>
 
     <script>
-        const myPlayerId = 3;
+        let myPlayerId = null;
+        let pollTimer = null;
+
+        function setStatus(msg, isError) {
+            const el = document.getElementById("statusMessage");
+            el.className = isError ? "error" : "";
+            el.textContent = msg || "";
+        }
+
+        async function loadCurrentUser() {
+            const res = await fetch("/api/account");
+            const data = await res.json();
+            if (!data.logged_in) {
+                window.location.href = "/login";
+                return false;
+            }
+            myPlayerId = data.player_id;
+            return true;
+        }
 
         async function createGame() {
-            const response = await fetch('/api/create_game', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ player_id: myPlayerId })
+            if (myPlayerId === null) {
+                if (!(await loadCurrentUser())) return;
+            }
+            const res = await fetch("/api/create_game", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({})
             });
-            
-            const data = await response.json();
-            const statusText = document.getElementById('statusMessage');
-
+            if (res.status === 401) {
+                window.location.href = "/login";
+                return;
+            }
+            const data = await res.json();
             if (data.status === "error") {
-                statusText.className = "error";
-                statusText.innerText = data.message;
+                setStatus(data.message, true);
             } else {
-                statusText.className = "";
-                statusText.innerText = "Game Created! ID: " + data.game_id;
-                fetchOpenGames(); 
+                setStatus("Lobby created! Game #" + data.game_id + " — you are in seat 1 (team 1).", false);
+                fetchOpenGames();
             }
         }
+
+        document.getElementById("createBtn").addEventListener("click", createGame);
 
         async function fetchOpenGames() {
-            const response = await fetch('/api/open_games');
-            const games = await response.json();
-            
-            const container = document.getElementById('lobbiesContainer');
-            container.innerHTML = ''; 
-            
-            games.forEach(game => {
-                const currentPlayers = game.players ? game.players.split(',') : [];
-                const isAlreadyInLobby = currentPlayers.includes(myPlayerId.toString());
-                
+            if (myPlayerId === null) {
+                if (!(await loadCurrentUser())) return;
+            }
+            const res = await fetch("/api/open_games");
+            if (res.status === 401) {
+                window.location.href = "/login";
+                return;
+            }
+            const games = await res.json();
+            const container = document.getElementById("lobbiesContainer");
+            container.innerHTML = "";
+
+            if (!Array.isArray(games) || games.length === 0) {
+                container.innerHTML = "<p class=\"muted\">No open lobbies. Create one or check again soon.</p>";
+                return;
+            }
+
+            games.forEach(function (game) {
+                const t1 = game.team1_count != null ? game.team1_count : 0;
+                const t2 = game.team2_count != null ? game.team2_count : 0;
+                const total = game.player_count != null ? game.player_count : 0;
+                const gid = game.game_id;
+                const inHere = game.in_this_lobby;
+
+                let body = "<div class=\"team-pill t1\">Team 1: " + t1 + "/2</div>";
+                body += "<div class=\"team-pill t2\">Team 2: " + t2 + "/2</div>";
+                body += "<div class=\"muted\" style=\"margin-top:6px;\">Players: " + total + "/4 · Game #" + gid + "</div>";
+
                 let buttonHtml = "";
-                
-                if (isAlreadyInLobby) {
-                    buttonHtml = `<button disabled style="background-color: gray; color: white;">Waiting for players...</button>`;
+                if (inHere) {
+                    buttonHtml = "<button type=\"button\" disabled style=\"background:#888;color:#fff;border:none;\">In this lobby — waiting…</button>";
                 } else {
-                    buttonHtml = `<button onclick="joinGame(${game.game_id})">Join Game</button>`;
+                    const t1Full = t1 >= 2;
+                    const t2Full = t2 >= 2;
+                    buttonHtml =
+                        "<button type=\"button\" class=\"join-t1\" " +
+                        (t1Full ? "disabled" : "onclick=\"joinGame(" + gid + ", 1)\"") +
+                        ">Join team 1</button> " +
+                        "<button type=\"button\" class=\"join-t2\" " +
+                        (t2Full ? "disabled" : "onclick=\"joinGame(" + gid + ", 2)\"") +
+                        ">Join team 2</button>";
                 }
 
-                const box = `<div class="lobby-box">
-                    <strong>Game ID: ${game.game_id}</strong><br>
-                    <small>Started: ${game.started_time}</small><br>
-                    <small>Players in lobby: ${currentPlayers.length}/4</small><br><br>
-                    ${buttonHtml}
-                </div>`;
-                container.innerHTML += box;
+                const box = document.createElement("div");
+                box.className = "lobby-box" + (inHere ? " mine" : "");
+                box.innerHTML =
+                    "<strong>Game #" + gid + "</strong><br>" +
+                    "<small>Started: " + game.started_time + "</small>" +
+                    "<div class=\"teams\">" + body + "</div>" +
+                    "<div style=\"margin-top:8px;\">" + buttonHtml + "</div>";
+                container.appendChild(box);
             });
         }
 
-        async function joinGame(gameId) {
-            const response = await fetch('/api/join_game', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ game_id: gameId, player_id: myPlayerId })
+        async function joinGame(gameId, teamNumber) {
+            const res = await fetch("/api/join_game", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ game_id: gameId, team_number: teamNumber })
             });
-            
-            const data = await response.json();
-            const statusText = document.getElementById('statusMessage');
-            
-            if (data.status === "error") {
-                statusText.className = "error";
-                statusText.innerText = data.message;
-            } else {
-                statusText.className = "";
-                statusText.innerText = data.message;
-                fetchOpenGames(); 
+            if (res.status === 401) {
+                window.location.href = "/login";
+                return;
             }
+            const data = await res.json();
+            if (data.status === "error") {
+                setStatus(data.message, true);
+            } else {
+                setStatus(data.message, false);
+            }
+            fetchOpenGames();
         }
-        window.onload = fetchOpenGames;
+
+        window.addEventListener("load", async function () {
+            if (!(await loadCurrentUser())) return;
+            await fetchOpenGames();
+            pollTimer = setInterval(fetchOpenGames, 2000);
+        });
+
+        window.addEventListener("beforeunload", function () {
+            if (pollTimer) clearInterval(pollTimer);
+        });
+
+        document.addEventListener("visibilitychange", function () {
+            if (document.visibilityState === "visible") fetchOpenGames();
+        });
     </script>
 
 </body>

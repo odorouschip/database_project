@@ -256,29 +256,51 @@ def get_leaderboard():
 
 @app.route('/api/open_games', methods=['GET'])
 def get_open_games():
+    if not logged_in():
+        return jsonify({"error": "Not logged in"}), 401
+
     conn = get_db_connection()
     if not conn:
         return jsonify({"error": "Database connection failed"}), 500
-        
+
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
-        SELECT g.game_id, g.started_time, GROUP_CONCAT(gp.player_id) as players
+        SELECT
+            g.game_id,
+            g.started_time,
+            GROUP_CONCAT(gp.player_id ORDER BY gp.player_id) AS players,
+            COALESCE(SUM(CASE WHEN gp.seat_position IN (1, 3) THEN 1 ELSE 0 END), 0) AS team1_count,
+            COALESCE(SUM(CASE WHEN gp.seat_position IN (2, 4) THEN 1 ELSE 0 END), 0) AS team2_count,
+            COALESCE(COUNT(gp.player_id), 0) AS player_count
         FROM Game g
         LEFT JOIN Game_Player gp ON g.game_id = gp.game_id
         WHERE g.status = 'active'
-        GROUP BY g.game_id
+        GROUP BY g.game_id, g.started_time
     """)
     results = cursor.fetchall()
-    
+
+    my_id = str(session["player_id"])
+    for r in results:
+        if r.get("started_time"):
+            r["started_time"] = r["started_time"].isoformat()
+        for k in ("team1_count", "team2_count", "player_count"):
+            if r.get(k) is not None:
+                r[k] = int(r[k])
+        players = r.get("players")
+        ids = players.split(",") if players else []
+        r["in_this_lobby"] = my_id in ids
+
     cursor.close()
     conn.close()
     return jsonify(results)
 
 @app.route('/api/create_game', methods=['POST'])
 def create_game():
-    data = request.json
-    player_id = data.get('player_id') 
-    
+    if not logged_in():
+        return jsonify({"status": "error", "message": "Not logged in"}), 401
+
+    player_id = session["player_id"]
+
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -289,6 +311,8 @@ def create_game():
     """, (player_id,))
     
     if cursor.fetchone():
+        cursor.close()
+        conn.close()
         return jsonify({"status": "error", "message": "You are already in an active game!"})
         
     cursor.execute(
@@ -309,51 +333,83 @@ def create_game():
 
 @app.route('/api/join_game', methods=['POST'])
 def join_game():
-    data = request.json
-    game_id = data.get('game_id')
-    player_id = data.get('player_id')
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT gp.game_id FROM Game_Player gp 
-        JOIN Game g ON gp.game_id = g.game_id 
-        WHERE gp.player_id = %s AND g.status = 'active'
-    """, (player_id,))
-    
-    if cursor.fetchone():
-        return jsonify({"status": "error", "message": "You are already in an active game!"})
+    if not logged_in():
+        return jsonify({"status": "error", "message": "Not logged in"}), 401
+
+    data = request.json or {}
+    game_id = data.get("game_id")
+    player_id = session["player_id"]
+    team_number = data.get("team_number")
 
     try:
-        cursor.execute("SELECT seat_position FROM Game_Player WHERE game_id = %s", (game_id,))
-        taken_seats = [row[0] for row in cursor.fetchall()]
-        
+        team_number = int(team_number)
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "team_number must be 1 or 2"}), 400
+
+    if team_number not in (1, 2):
+        return jsonify({"status": "error", "message": "team_number must be 1 or 2"}), 400
+
+    if game_id is None:
+        return jsonify({"status": "error", "message": "game_id is required"}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"status": "error", "message": "Database connection failed"}), 500
+
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT gp.game_id FROM Game_Player gp
+            JOIN Game g ON gp.game_id = g.game_id
+            WHERE gp.player_id = %s AND g.status = 'active'
+        """, (player_id,))
+
+        if cursor.fetchone():
+            return jsonify({"status": "error", "message": "You are already in an active game!"})
+
+        cursor.execute(
+            "SELECT status FROM Game WHERE game_id = %s",
+            (game_id,),
+        )
+        row = cursor.fetchone()
+        if not row or row[0] != "active":
+            return jsonify({"status": "error", "message": "This lobby is not available."}), 400
+
+        team_seats = (1, 3) if team_number == 1 else (2, 4)
+
+        cursor.execute(
+            "SELECT seat_position FROM Game_Player WHERE game_id = %s",
+            (game_id,),
+        )
+        taken_seats = {row[0] for row in cursor.fetchall()}
+
         available_seat = None
-        for seat in [2, 3, 4]:
+        for seat in team_seats:
             if seat not in taken_seats:
                 available_seat = seat
                 break
-                
+
         if not available_seat:
-            return jsonify({"status": "error", "message": "This lobby is full!"})
+            return jsonify(
+                {"status": "error", "message": f"Team {team_number} is full (2/2)."}
+            ), 400
 
         cursor.execute(
             "INSERT INTO Game_Player (game_id, player_id, seat_position) VALUES (%s, %s, %s)",
-            (game_id, player_id, available_seat)
+            (game_id, player_id, available_seat),
         )
         conn.commit()
-        response = {"message": f"Successfully joined in Seat {available_seat}!", "status": "success"}
-        
-    except mysql.connector.IntegrityError:
+        return jsonify({
+            "message": f"Joined team {team_number} (seat {available_seat}).",
+            "status": "success",
+        })
+
+    except IntegrityError:
         conn.rollback()
-        response = {"message": "A database error occurred.", "status": "error"}
-        
+        return jsonify({"message": "A database error occurred.", "status": "error"})
     finally:
         cursor.close()
         conn.close()
-        
-    return jsonify(response)
 
 @app.route('/api/past_matches', methods=['GET'])
 def get_past_matches():
