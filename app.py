@@ -396,19 +396,92 @@ def get_past_matches():
 
     for m in matches:
         cursor.execute("""
-            SELECT p.username, gp.seat_position
+            SELECT p.username, gp.seat_position,
+                   CASE WHEN gp.seat_position IN (1,3) THEN 1 ELSE 2 END AS team_number
             FROM Game_Player gp
             JOIN Player p ON p.player_id = gp.player_id
             WHERE gp.game_id = %s AND gp.player_id != %s
             ORDER BY gp.seat_position
         """, (m['game_id'], pid))
-        m['opponents'] = cursor.fetchall()
+        others = cursor.fetchall()
+
+        m['teammate'] = None
+        m['opponents'] = []
+        for o in others:
+            if o['team_number'] == m['my_team_number']:
+                m['teammate'] = o
+            else:
+                m['opponents'].append(o)
+
         if m['ended_time']:
             m['ended_time'] = m['ended_time'].isoformat()
 
     cursor.close()
     conn.close()
     return jsonify(matches)
+
+@app.route('/match/<int:game_id>/summary')
+def show_match_summary(game_id):
+    if not logged_in():
+        return redirect_to_login()
+    return render_template('match_summary.html', game_id=game_id)
+
+@app.route('/api/match/<int:game_id>/summary', methods=['GET'])
+def get_match_summary(game_id):
+    if not logged_in():
+        return jsonify({"error": "Not logged in"}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database connection failed"}), 500
+
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT game_id, started_time, ended_time, status,
+               target_score, winning_team_number
+        FROM Game
+        WHERE game_id = %s
+    """, (game_id,))
+    game = cursor.fetchone()
+
+    if not game:
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "Match not found"}), 404
+
+    if game.get('started_time'):
+        game['started_time'] = game['started_time'].isoformat()
+    if game.get('ended_time'):
+        game['ended_time'] = game['ended_time'].isoformat()
+
+    cursor.execute("""
+        SELECT team_number, score
+        FROM Team
+        WHERE game_id = %s
+        ORDER BY team_number
+    """, (game_id,))
+    teams = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT
+            p.player_id, p.username, gp.seat_position,
+            CASE WHEN gp.seat_position IN (1,3) THEN 1 ELSE 2 END AS team_number
+        FROM Game_Player gp
+        JOIN Player p ON p.player_id = gp.player_id
+        WHERE gp.game_id = %s
+        ORDER BY team_number, gp.seat_position
+    """, (game_id,))
+    players = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        "game": game,
+        "teams": teams,
+        "players": players
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

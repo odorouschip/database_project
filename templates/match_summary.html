@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Match Summary</title>
+</head>
+<body>
+    <h2>Match Summary</h2>
+    <a href="/account">Back to Account</a>
+
+    <div id="summary">Loading...</div>
+
+    <script>
+        const gameId = {{ game_id }};
+
+        async function loadSummary() {
+            const res = await fetch("/api/match/" + gameId + "/summary");
+            const div = document.getElementById("summary");
+
+            if (!res.ok) {
+                div.innerText = "Could not load match.";
+                return;
+            }
+
+            const data = await res.json();
+            const g = data.game;
+            const date = g.ended_time ? g.ended_time.split("T")[0] : "in progress";
+
+            let html = "";
+            html += "<p>Game #" + g.game_id + "</p>";
+            html += "<p>Date: " + date + "</p>";
+            html += "<p>Status: " + g.status + "</p>";
+            html += "<p>Target Score: " + g.target_score + "</p>";
+
+            if (g.winning_team_number) {
+                html += "<p>Winner: Team " + g.winning_team_number + "</p>";
+            }
+
+            data.teams.forEach(function (t) {
+                html += "<h3>Team " + t.team_number + "</h3>";
+                html += "<p>Score: " + t.score + "</p>";
+                html += "<ul>";
+                data.players
+                    .filter(function (p) { return p.team_number === t.team_number; })
+                    .forEach(function (p) {
+                        html += "<li>" + p.username + " (seat " + p.seat_position + ")</li>";
+                    });
+                html += "</ul>";
+            });
+
+            div.innerHTML = html;
+        }
+
+        loadSummary();
+    </script>
+</body>
+</html>

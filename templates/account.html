@@ -283,21 +283,23 @@
             container.innerHTML = "";
             matches.forEach(function (m) {
                 const dateStr = m.ended_time ? m.ended_time.split("T")[0] : "";
+                const teammateName = m.teammate ? m.teammate.username : "(none)";
                 const opponentNames = m.opponents
                     .map(function (o) { return o.username; })
-                    .join(", ");
+                    .join(" & ");
 
                 const row = document.createElement("div");
                 row.style.border = "1px solid #ccc";
                 row.style.padding = "8px";
                 row.style.marginBottom = "6px";
                 row.innerHTML =
-                    "<strong>vs " + opponentNames + "</strong>" +
+                    "<strong>with " + teammateName + " vs " + opponentNames + "</strong>" +
                     " &nbsp; " + dateStr +
                     " &nbsp; " + m.my_score + "-" + m.opp_score +
                     " &nbsp; <span style='color:" +
                     (m.result === "Win" ? "green" : "red") + ";'>" +
-                    m.result + "</span>";
+                    m.result + "</span>" +
+                    " &nbsp; <a href='/match/" + m.game_id + "/summary'>View Summary</a>";
                 container.appendChild(row);
             });
         }
