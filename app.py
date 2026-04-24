@@ -483,5 +483,78 @@ def get_match_summary(game_id):
         "players": players
     })
 
+@app.route('/match/<int:game_id>/replay')
+def show_match_replay(game_id):
+    if not logged_in():
+        return redirect_to_login()
+    return render_template('replay.html', game_id=game_id)
+
+@app.route('/api/match/<int:game_id>/replay', methods=['GET'])
+def get_match_replay(game_id):
+    if not logged_in():
+        return jsonify({"error": "Not logged in"}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database connection failed"}), 500
+
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT game_id, started_time, ended_time, status,
+               target_score, winning_team_number
+        FROM Game
+        WHERE game_id = %s
+    """, (game_id,))
+    game = cursor.fetchone()
+
+    if not game:
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "Match not found"}), 404
+
+    if game.get('started_time'):
+        game['started_time'] = game['started_time'].isoformat()
+    if game.get('ended_time'):
+        game['ended_time'] = game['ended_time'].isoformat()
+
+    cursor.execute("""
+        SELECT
+            m.move_id,
+            r.round_number,
+            m.order_played,
+            m.time_stamp,
+            p.username,
+            gp.seat_position
+        FROM Game_Moves gm
+        JOIN Move m ON gm.move_id = m.move_id
+        JOIN Round r ON gm.round_id = r.round_id
+        JOIN Player_Move pm ON pm.move_id = m.move_id
+        JOIN Player p ON p.player_id = pm.player_id
+        JOIN Game_Player gp ON gp.game_id = gm.game_id AND gp.player_id = pm.player_id
+        WHERE gm.game_id = %s
+        ORDER BY r.round_number, m.order_played
+    """, (game_id,))
+    moves = cursor.fetchall()
+
+    for mv in moves:
+        if mv.get('time_stamp'):
+            mv['time_stamp'] = mv['time_stamp'].isoformat()
+        cursor.execute("""
+            SELECT t.tile_id, t.tile_name, t.score
+            FROM Tile_Moved tm
+            JOIN Tile t ON t.tile_id = tm.tile_id
+            WHERE tm.move_id = %s
+        """, (mv['move_id'],))
+        mv['tiles'] = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        "game": game,
+        "moves": moves
+    })
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

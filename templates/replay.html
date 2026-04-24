@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Match Replay</title>
+</head>
+<body>
+    <h2>Match Replay</h2>
+    <a href="/account">Back to Account</a>
+
+    <div id="replay">Loading...</div>
+
+    <script>
+        const gameId = {{ game_id }};
+        let replayData = null;
+        let currentIndex = 0;
+
+        async function loadReplay() {
+            const res = await fetch("/api/match/" + gameId + "/replay");
+            const div = document.getElementById("replay");
+
+            if (!res.ok) {
+                div.innerText = "Could not load replay.";
+                return;
+            }
+
+            replayData = await res.json();
+
+            if (replayData.moves.length === 0) {
+                div.innerHTML =
+                    "<p>Game #" + replayData.game.game_id + "</p>" +
+                    "<p>No moves recorded for this match.</p>" +
+                    "<button onclick='exportJSON()'>Export JSON</button>";
+                return;
+            }
+
+            renderControls();
+            renderMove();
+        }
+
+        function renderControls() {
+            const div = document.getElementById("replay");
+            div.innerHTML =
+                "<p>Game #" + replayData.game.game_id +
+                " &nbsp; Status: " + replayData.game.status + "</p>" +
+                "<p id='moveCounter'></p>" +
+                "<div id='moveDisplay'></div>" +
+                "<button onclick='prevMove()'>Previous</button> " +
+                "<button onclick='nextMove()'>Next</button> " +
+                "<button onclick='exportJSON()'>Export JSON</button>";
+        }
+
+        function renderMove() {
+            const mv = replayData.moves[currentIndex];
+            const total = replayData.moves.length;
+
+            document.getElementById("moveCounter").innerText =
+                "Move " + (currentIndex + 1) + " of " + total;
+
+            const tiles = mv.tiles
+                .map(function (t) { return t.tile_name + " (" + t.score + ")"; })
+                .join(", ");
+
+            document.getElementById("moveDisplay").innerHTML =
+                "<p>Round " + mv.round_number + ", Order " + mv.order_played + "</p>" +
+                "<p>Player: " + mv.username + " (seat " + mv.seat_position + ")</p>" +
+                "<p>Tiles played: " + tiles + "</p>";
+        }
+
+        function nextMove() {
+            if (currentIndex < replayData.moves.length - 1) {
+                currentIndex++;
+                renderMove();
+            }
+        }
+
+        function prevMove() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                renderMove();
+            }
+        }
+
+        function exportJSON() {
+            const dataStr = JSON.stringify(replayData, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "match_" + gameId + "_replay.json";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        loadReplay();
+    </script>
+</body>
+</html>

@@ -299,7 +299,8 @@
                     " &nbsp; <span style='color:" +
                     (m.result === "Win" ? "green" : "red") + ";'>" +
                     m.result + "</span>" +
-                    " &nbsp; <a href='/match/" + m.game_id + "/summary'>View Summary</a>";
+                    " &nbsp; <a href='/match/" + m.game_id + "/summary'>View Summary</a>" +
+                    " &nbsp; <a href='/match/" + m.game_id + "/replay'>View Replay</a>";
                 container.appendChild(row);
             });
         }
