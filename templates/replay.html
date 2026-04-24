@@ -7,10 +7,10 @@
     <h2>Match Replay</h2>
     <a href="/account">Back to Account</a>
 
-    <div id="replay">Loading...</div>
+    <div id="replay" data-game-id="{{ game_id }}">Loading...</div>
 
     <script>
-        const gameId = {{ game_id }};
+        const gameId = document.getElementById("replay").dataset.gameId;
         let replayData = null;
         let currentIndex = 0;
 
