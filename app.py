@@ -242,10 +242,10 @@ def get_leaderboard():
     cursor = conn.cursor(dictionary=True)
     
     if search_query:
-        query = "SELECT * FROM Lobby WHERE username LIKE %s ORDER BY `rank` DESC"
+        query = "SELECT * FROM Lobby WHERE username LIKE %s ORDER BY `rank` ASC"
         cursor.execute(query, (f"%{search_query}%",))
     else:
-        query = "SELECT * FROM Lobby ORDER BY `rank` DESC LIMIT 50"
+        query = "SELECT * FROM Lobby ORDER BY `rank` ASC LIMIT 50"
         cursor.execute(query)
         
     results = cursor.fetchall()
