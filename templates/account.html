@@ -13,6 +13,7 @@
       <a href="/matchmaking">Play</a>
       <a href="/leaderboard">Leaderboard</a>
       <a href="/account" class="active">Account</a>
+      <a href="#" class="nav-logout" id="navLogout">Sign out</a>
     </div>
   </nav>
 
@@ -22,7 +23,6 @@
         <div class="page-title" id="usernameDisplay">Loading…</div>
         <div class="page-sub mb-0">Your account settings and match history</div>
       </div>
-      <button id="logoutButton" class="btn btn-ghost btn-sm">Sign out</button>
     </div>
 
     <!-- Change Username -->
@@ -192,12 +192,7 @@
       setMsg(data.message || "Failed to delete account.", true);
     });
 
-    // Logout
-    document.getElementById("logoutButton").addEventListener("click", async function() {
-      const res = await fetch("/api/logout", { method: "POST", headers: { "Content-Type": "application/json" } });
-      if (res.ok) { window.location.href = "/login?logout=1"; return; }
-      setMsg("Failed to log out.", true);
-    });
+
 
     // Past matches
     async function loadPastMatches() {
@@ -241,6 +236,13 @@
 
     loadAccountInfo();
     loadPastMatches();
+
+    document.getElementById("navLogout").addEventListener("click", async function(e) {
+      e.preventDefault();
+      const res = await fetch("/api/logout", { method: "POST", headers: { "Content-Type": "application/json" } });
+      if (res.ok) window.location.href = "/login?logout=1";
+      else setMsg("Failed to log out.", true);
+    });
   </script>
 </body>
 </html>
