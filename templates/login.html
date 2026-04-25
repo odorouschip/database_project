@@ -1,70 +1,66 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Login</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goita — Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h2>Login</h2>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">GO<span>I</span>TA</div>
 
-    <form id="loginForm">
-        <input type="text" id="username" placeholder="Username" required>
-        <br><br>
-        <input type="password" id="password" placeholder="Password" required>
-        <br><br>
-        <button type="submit">Login</button>
-    </form>
+      <p id="message" class="alert alert-success" style="margin-bottom:18px;margin-top:0;"></p>
 
-    <p id="error" style="color:red;"></p>
-    <p id="message" style="color:green;"></p>
+      <form id="loginForm">
+        <div class="field">
+          <label class="field-label" for="username">Username</label>
+          <input type="text" id="username" placeholder="Enter username" required autocomplete="username">
+        </div>
+        <div class="field">
+          <label class="field-label" for="password">Password</label>
+          <input type="password" id="password" placeholder="Enter password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:4px;">Sign In</button>
+      </form>
 
-    <script>
-	    const params = new URLSearchParams(window.location.search);
-	    if (params.get("created") === "1") {
-		document.getElementById("message").innerText = 
-			    "Account created successfully, login now!";
-	    }
-        if (params.get("deleted") === "1"){
-            document.getElementById("message").innerText =
-                "Account deleted successfully, please log in or create an account now!";
-        }
-        if (params.get("logout") === "1"){
-            document.getElementById("message").innerText =
-                "Logged out successfully."
-        }
+      <p id="error" class="alert alert-error"></p>
 
-    </script>
+      <div class="auth-footer">
+        New here? <a href="/newuser">Create an account</a>
+      </div>
+    </div>
+  </div>
 
-    <script>
-        document.getElementById("loginForm").addEventListener("submit", async function(e) {
-            e.preventDefault();
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const msgEl = document.getElementById("message");
+    if (params.get("created") === "1")
+      msgEl.innerText = "Account created — you can sign in now.";
+    else if (params.get("deleted") === "1")
+      msgEl.innerText = "Account deleted successfully.";
+    else if (params.get("logout") === "1")
+      msgEl.innerText = "Logged out successfully.";
+    else
+      msgEl.style.display = "none";
 
-            const username = document.getElementById("username").value;
-            const password = document.getElementById("password").value;
+    document.getElementById("loginForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const errEl = document.getElementById("error");
+      errEl.innerText = "";
 
-            const res = await fetch("/api/login_button", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ username, password })
-            });
+      const res = await fetch("/api/login_button", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
 
-            if (res.redirected) {
-                // Flask redirect → follow it
-                window.location.href = res.url;
-                return;
-            }
-
-            if (!res.ok) {
-                document.getElementById("error").innerText = "Invalid credentials";
-            }
-        });
-    </script>
-    <p>
-	New here?
-	<button onclick="window.location.href='/newuser'">
-		Create account
-	</button>
-    </p>
+      if (res.redirected) { window.location.href = res.url; return; }
+      if (!res.ok) errEl.innerText = "Invalid username or password.";
+    });
+  </script>
 </body>
 </html>
