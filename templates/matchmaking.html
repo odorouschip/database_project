@@ -89,8 +89,10 @@
       container.innerHTML = games.map(function(game) {
         const t1 = game.team1_count || 0;
         const t2 = game.team2_count || 0;
+        const pc = game.player_count || 0;
         const gid = game.game_id;
         const inHere = game.in_this_lobby;
+        const fullLobby = t1 === 2 && t2 === 2 && pc === 4;
 
         const dateStr = game.started_time
           ? `<span class="text-muted small">Started ${game.started_time}</span>`
@@ -98,7 +100,11 @@
 
         let actions = "";
         if (inHere) {
-          actions = `<button class="btn btn-ghost btn-sm" disabled>Waiting for players…</button>`;
+          if (fullLobby) {
+            actions = `<button class="btn btn-primary btn-sm" type="button" onclick="startGame(${gid})">Start game</button>`;
+          } else {
+            actions = `<button class="btn btn-ghost btn-sm" type="button" disabled>Waiting for players…</button>`;
+          }
         } else {
           actions =
             `<button class="btn btn-t1 btn-sm" ${t1 >= 2 ? "disabled" : `onclick="joinGame(${gid},1)"`}>Join Team 1</button>` +
@@ -144,14 +150,48 @@
       fetchOpenGames();
     }
 
+    async function checkMyMatch() {
+      if (myPlayerId === null && !(await loadCurrentUser())) return;
+      const res = await fetch("/api/my_match");
+      if (res.status === 401) { window.location.href = "/login"; return; }
+      const d = await res.json();
+      if (d && d.at_table && d.game_id) {
+        window.location.href = "/play/" + d.game_id;
+      }
+    }
+
+    async function startGame(gameId) {
+      if (myPlayerId === null && !(await loadCurrentUser())) return;
+      const res = await fetch("/api/start_game", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game_id: gameId })
+      });
+      if (res.status === 401) { window.location.href = "/login"; return; }
+      const data = await res.json();
+      if (data.status === "error") { setStatus(data.message, true); return; }
+      if (data.game_id) {
+        setStatus("Starting game…", false);
+        window.location.href = "/play/" + data.game_id;
+        return;
+      }
+      setStatus(data.message || "Game started.", false);
+    }
+
+    async function matchmakingTick() {
+      if (myPlayerId === null && !(await loadCurrentUser())) return;
+      await checkMyMatch();
+      await fetchOpenGames();
+    }
+
     window.addEventListener("load", async function() {
       if (!(await loadCurrentUser())) return;
-      await fetchOpenGames();
-      pollTimer = setInterval(fetchOpenGames, 2000);
+      await matchmakingTick();
+      pollTimer = setInterval(matchmakingTick, 2000);
     });
     window.addEventListener("beforeunload", function() { if (pollTimer) clearInterval(pollTimer); });
     document.addEventListener("visibilitychange", function() {
-      if (document.visibilityState === "visible") fetchOpenGames();
+      if (document.visibilityState === "visible") matchmakingTick();
     });
 
     document.getElementById("navLogout").addEventListener("click", async function(e) {

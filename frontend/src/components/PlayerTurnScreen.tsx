@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Tile, Player, AttackState, PlayerBoardRecord } from '../types';
 import { TileCard, TILE_KANJI, TILE_NAMES } from './TileCard';
 import type { TileState } from './TileCard';

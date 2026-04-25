@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goita — Game #{{ game_id }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .goita-shell { width: 100%; margin-top: 16px; border-radius: 10px; overflow: hidden; background: #1a1d24; min-height: min(80vh, 900px); }
+    .goita-iframe { display: block; width: 100%; height: min(80vh, 900px); border: 0; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-logo" href="/matchmaking">GO<span>I</span>TA</a>
+    <div class="nav-links">
+      <a href="/matchmaking">Play</a>
+      <a href="/leaderboard">Leaderboard</a>
+      <a href="/account">Account</a>
+      <a href="#" class="nav-logout" id="navLogout">Sign out</a>
+    </div>
+  </nav>
+
+  <div class="page" style="max-width:100%;">
+    <div class="page-title">Game #{{ game_id }}</div>
+    <p class="page-sub" style="margin-bottom:6px;">Match in progress — the board is one shared in-browser table. When you are done, use <strong>Back to lobby</strong> on the end screen to save the result and rejoin the lobby.</p>
+    <p style="font-size:13px; color:var(--muted); margin:0 0 12px 0;">
+      <button type="button" class="btn btn-ghost btn-sm" id="forfeitBtn" style="color:var(--danger, #c44);">Forfeit and leave (no result saved)</button>
+    </p>
+    {% if error %}
+    <p class="alert alert-error">{{ error }}</p>
+    {% else %}
+    <div class="goita-shell" id="goitaShell">
+      <iframe
+        class="goita-iframe"
+        title="Goita"
+        src="{{ url_for('static', filename='goita_app/index.html') }}?game_id={{ game_id }}"></iframe>
+    </div>
+    <p id="goitaBuildHint" class="text-muted small" style="display:none; margin-top:10px;">
+      Game assets not found. From the <code>frontend</code> folder run: <code>npm install</code> then <code>npm run build</code>
+    </p>
+    {% endif %}
+  </div>
+
+  <script>
+    document.getElementById("navLogout").addEventListener("click", async function(e) {
+      e.preventDefault();
+      const res = await fetch("/api/logout", { method: "POST", headers: { "Content-Type": "application/json" } });
+      if (res.ok) window.location.href = "/login?logout=1";
+    });
+    document.getElementById("forfeitBtn").addEventListener("click", async function() {
+      if (!confirm("Abandon this match? It will not appear in match history, and you can return to the lobby to play with a different group.")) return;
+      const res = await fetch("/api/match/{{ game_id }}/abandon", { method: "POST", headers: { "Content-Type": "application/json" } });
+      if (res.status === 401) { window.location.href = "/login"; return; }
+      if (!res.ok) { alert("Could not leave match."); return; }
+      window.location.href = "/matchmaking";
+    });
+    (function() {
+      fetch("{{ url_for('static', filename='goita_app/index.html') }}", { method: "HEAD" })
+        .then(function(r) {
+          if (r.status === 404) {
+            var h = document.getElementById("goitaBuildHint");
+            if (h) h.style.display = "block";
+          }
+        })
+        .catch(function() {
+          var h = document.getElementById("goitaBuildHint");
+          if (h) h.style.display = "block";
+        });
+    })();
+  </script>
+</body>
+</html>

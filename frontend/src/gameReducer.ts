@@ -224,7 +224,17 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'RESTART_GAME': {
-      return { ...initialState };
+      if (!state.players || state.players.length !== 4) {
+        return { ...initialState };
+      }
+      const playerNames = state.players.map(p => p.name) as [string, string, string, string];
+      const players = playerNames.map((name, i) => ({
+        index: i as PlayerIndex,
+        name,
+        teamId: getTeamId(i as PlayerIndex),
+      })) as GameState['players'];
+      const round = initRound(1, 0);
+      return afterDeal({ ...state, players, teamScores: { A: 0, B: 0 } }, round);
     }
 
     default:

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Goita Online — Home</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 24px; max-width: 640px; line-height: 1.5; }
+        h1 { font-size: 1.5rem; margin-top: 0; }
+        .nav { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+        .nav a {
+            display: inline-block; padding: 10px 14px; background: #1976d2; color: #fff;
+            text-decoration: none; border-radius: 6px; font-size: 14px;
+        }
+        .nav a.secondary { background: #5f6368; }
+        .nav a:hover { filter: brightness(1.08); }
+        #logoutBtn { background: #5f6368; color: #fff; padding: 10px 14px; border-radius: 6px; }
+        .welcome { color: #333; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <h1>Goita Online</h1>
+    <p class="welcome">You are signed in as <strong>{{ username }}</strong>.</p>
+    <p>Choose where to go next:</p>
+    <nav class="nav" aria-label="Main">
+        <a href="/matchmaking">Matchmaking</a>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/account">Account</a>
+    </nav>
+    <p>
+        <button type="button" class="nav secondary" id="logoutBtn" style="border:none;cursor:pointer;font:inherit;">
+            Log out
+        </button>
+    </p>
+    <script>
+        document.getElementById("logoutBtn").addEventListener("click", async function () {
+            await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
+            window.location.href = "/login?logout=1";
+        });
+    </script>
+</body>
+</html>

@@ -609,6 +609,7 @@ button { cursor: pointer; font-family: var(--font-ui); border: none; }
   color: var(--text-muted);
 }
 .game-over-winner { font-family: var(--font-display); font-size: clamp(2.5rem, 8vw, 4rem); font-weight: 400; color: var(--text); line-height: 1.1; }
+.game-over-saving { font-size: 0.85rem; color: var(--text-muted); margin: -0.5rem 0 0 0; }
 .game-over-players { display: flex; gap: var(--space-4); flex-wrap: wrap; justify-content: center; }
 .winner-name {
   font-size: 1rem;
@@ -641,6 +642,30 @@ button { cursor: pointer; font-family: var(--font-ui); border: none; }
 .final-score-total { font-family: var(--font-display); font-size: 3rem; font-weight: 400; color: var(--text); }
 .final-winner .final-score-total { color: var(--accent); }
 .final-vs { color: var(--text-muted); font-size: 0.85rem; }
+
+.game-over-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 320px;
+  align-items: stretch;
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 1.05rem;
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--text-muted);
+  background: var(--surface);
+}
+.btn-secondary:disabled { opacity: 0.3; cursor: default; }
+.game-over-hint { font-size: 0.8rem; color: var(--text-muted); max-width: 420px; line-height: 1.4; }
 
 @media (max-width: 480px) {
   .teams-grid { grid-template-columns: 1fr; }

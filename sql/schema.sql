@@ -106,7 +106,8 @@ CREATE TABLE Player_Move (
 CREATE TABLE Tile_Moved (
     move_id INT NOT NULL,
     tile_id INT NOT NULL,
-    PRIMARY KEY (move_id, tile_id),
+    line_idx TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (move_id, tile_id, line_idx),
     FOREIGN KEY (move_id) REFERENCES Move(move_id),
     FOREIGN KEY (tile_id) REFERENCES Tile(tile_id)
 );

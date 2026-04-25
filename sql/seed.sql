@@ -57,11 +57,11 @@ INSERT INTO Move (order_played, time_stamp) VALUES
 INSERT INTO Player_Move (player_id, move_id) VALUES
 (1,1),(2,2),(3,3),(4,4);
 
-INSERT INTO Tile_Moved (move_id, tile_id) VALUES
-(1,1),(1,2),
-(2,3),
-(3,4),(3,5),
-(4,1);
+INSERT INTO Tile_Moved (move_id, tile_id, line_idx) VALUES
+(1,1,0),(1,2,0),
+(2,3,0),
+(3,4,0),(3,5,0),
+(4,1,0);
 
 INSERT INTO Game_Moves (game_id, round_id, move_id) VALUES
 (1,1,1),
