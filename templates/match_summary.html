@@ -1,57 +1,94 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Match Summary</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goita — Match Summary</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h2>Match Summary</h2>
-    <a href="/account">Back to Account</a>
-    | <a href="/match/{{ game_id }}/replay">View Replay</a>
+  <nav class="nav">
+    <a class="nav-logo" href="/matchmaking">GO<span>I</span>TA</a>
+    <div class="nav-links">
+      <a href="/matchmaking">Play</a>
+      <a href="/leaderboard">Leaderboard</a>
+      <a href="/account">Account</a>
+    </div>
+  </nav>
 
-    <div id="summary" data-game-id="{{ game_id }}">Loading...</div>
+  <div class="page" id="summary" data-game-id="{{ game_id }}">
 
-    <script>
-        const gameId = document.getElementById("summary").dataset.gameId;
+    <!-- nav breadcrumb -->
+    <div style="margin-bottom:24px; font-size:13px; color:var(--muted); display:flex; gap:16px; flex-wrap:wrap;">
+      <a href="/account" style="color:var(--muted); text-decoration:none;">← Account</a>
+      <a id="replayLink" href="#" style="color:var(--accent); text-decoration:none;">View Replay →</a>
+    </div>
 
-        async function loadSummary() {
-            const res = await fetch("/api/match/" + gameId + "/summary");
-            const div = document.getElementById("summary");
+    <div id="summaryContent">
+      <div class="card" style="color:var(--muted); font-size:13px;">Loading match data…</div>
+    </div>
+  </div>
 
-            if (!res.ok) {
-                div.innerText = "Could not load match.";
-                return;
-            }
+  <script>
+    const gameId = document.getElementById("summary").dataset.gameId;
+    document.getElementById("replayLink").href = "/match/" + gameId + "/replay";
 
-            const data = await res.json();
-            const g = data.game;
-            const date = g.ended_time ? g.ended_time.split("T")[0] : "in progress";
+    async function loadSummary() {
+      const container = document.getElementById("summaryContent");
+      const res = await fetch("/api/match/" + gameId + "/summary");
 
-            let html = "";
-            html += "<p>Game #" + g.game_id + "</p>";
-            html += "<p>Date: " + date + "</p>";
-            html += "<p>Status: " + g.status + "</p>";
-            html += "<p>Target Score: " + g.target_score + "</p>";
+      if (!res.ok) {
+        container.innerHTML = '<div class="card" style="color:var(--muted);">Could not load match.</div>';
+        return;
+      }
 
-            if (g.winning_team_number) {
-                html += "<p>Winner: Team " + g.winning_team_number + "</p>";
-            }
+      const data = await res.json();
+      const g    = data.game;
+      const date = g.ended_time ? g.ended_time.split("T")[0] : "In progress";
 
-            data.teams.forEach(function (t) {
-                html += "<h3>Team " + t.team_number + "</h3>";
-                html += "<p>Score: " + t.score + "</p>";
-                html += "<ul>";
-                data.players
-                    .filter(function (p) { return p.team_number === t.team_number; })
-                    .forEach(function (p) {
-                        html += "<li>" + p.username + " (seat " + p.seat_position + ")</li>";
-                    });
-                html += "</ul>";
-            });
+      // Figure out winner display
+      let bannerClass = "neutral", resultLabel = "Match Summary", scoreHtml = "";
+      if (g.winning_team_number) {
+        bannerClass  = "neutral";
+        resultLabel  = "Team " + g.winning_team_number + " Wins";
+        const winner = data.teams.find(t => t.team_number === g.winning_team_number);
+        const loser  = data.teams.find(t => t.team_number !== g.winning_team_number);
+        if (winner && loser)
+          scoreHtml = `<div class="result-score">${winner.score} <span style="font-size:22px;color:var(--muted)">—</span> ${loser.score}</div>`;
+      }
 
-            div.innerHTML = html;
-        }
+      // Team cards
+      const teamsHtml = data.teams.map(function(t) {
+        const players = data.players
+          .filter(p => p.team_number === t.team_number)
+          .map(p => `<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:13px;color:var(--muted);width:52px;">Seat ${p.seat_position}</span>
+            <span style="font-weight:500;">${p.username}</span>
+          </div>`)
+          .join("");
 
-        loadSummary();
-    </script>
+        const isWinner = g.winning_team_number === t.team_number;
+        return `<div class="card" style="${isWinner ? "border-color:var(--accent-dk);" : ""}">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <div style="font-weight:600; letter-spacing:0.06em;">TEAM ${t.team_number}</div>
+            <div style="font-size:22px; font-weight:300;">${t.score} <span style="font-size:13px;color:var(--muted);">pts</span></div>
+          </div>
+          ${players}
+        </div>`;
+      }).join("");
+
+      container.innerHTML = `
+        <div class="result-banner ${bannerClass}">
+          <div class="result-label">${resultLabel}</div>
+          ${scoreHtml}
+          <div class="text-muted small" style="margin-top:8px;">Game #${g.game_id} &nbsp;·&nbsp; ${date} &nbsp;·&nbsp; First to ${g.target_score}</div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:4px;">
+          ${teamsHtml}
+        </div>`;
+    }
+
+    loadSummary();
+  </script>
 </body>
 </html>
