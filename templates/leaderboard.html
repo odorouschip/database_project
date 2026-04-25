@@ -13,6 +13,7 @@
       <a href="/matchmaking">Play</a>
       <a href="/leaderboard" class="active">Leaderboard</a>
       <a href="/account">Account</a>
+      <a href="#" class="nav-logout" id="navLogout">Sign out</a>
     </div>
   </nav>
 
@@ -31,13 +32,14 @@
           <tr>
             <th style="width:52px;">Rank</th>
             <th>Player</th>
+            <th>Rating</th>
             <th>Wins</th>
             <th>Losses</th>
             <th>Win Rate</th>
           </tr>
         </thead>
         <tbody id="leaderboardBody">
-          <tr><td colspan="5" style="padding:24px; color:var(--muted); font-size:13px;">Loading…</td></tr>
+          <tr><td colspan="6" style="padding:24px; color:var(--muted); font-size:13px;">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -51,19 +53,29 @@
       const tbody = document.getElementById("leaderboardBody");
 
       if (!data.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding:24px; color:var(--muted); font-size:13px;">No players found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="padding:24px; color:var(--muted); font-size:13px;">No players found.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = data.map(function(p) {
+      // Sort by rating descending if present, otherwise by wins
+      const sorted = [...data].sort((a, b) => {
+        if (a.rating != null && b.rating != null) return b.rating - a.rating;
+        return b.wins - a.wins;
+      });
+
+      tbody.innerHTML = sorted.map(function(p, i) {
+        const displayRank = i + 1;
         let badgeClass = "";
-        if (p.rank === 1) badgeClass = "gold";
-        else if (p.rank === 2) badgeClass = "silver";
-        else if (p.rank === 3) badgeClass = "bronze";
+        if (displayRank === 1) badgeClass = "gold";
+        else if (displayRank === 2) badgeClass = "silver";
+        else if (displayRank === 3) badgeClass = "bronze";
+
+        const rating = p.rating != null ? p.rating : "—";
 
         return `<tr>
-          <td><span class="rank-badge ${badgeClass}">${p.rank}</span></td>
+          <td><span class="rank-badge ${badgeClass}">${displayRank}</span></td>
           <td style="font-weight:500;">${p.username}</td>
+          <td style="font-weight:600; color:var(--accent);">${rating}</td>
           <td class="text-win">${p.wins}</td>
           <td class="text-muted">${p.losses}</td>
           <td style="font-weight:500;">${p.win_rate}%</td>
@@ -72,6 +84,12 @@
     }
 
     window.onload = fetchLeaderboard;
+
+    document.getElementById("navLogout").addEventListener("click", async function(e) {
+      e.preventDefault();
+      const res = await fetch("/api/logout", { method: "POST", headers: { "Content-Type": "application/json" } });
+      if (res.ok) window.location.href = "/login?logout=1";
+    });
   </script>
 </body>
 </html>
