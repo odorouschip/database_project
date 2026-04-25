@@ -52,6 +52,11 @@
       const data = await res.json();
       const tbody = document.getElementById("leaderboardBody");
 
+      if (!Array.isArray(data)) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding:24px; color:var(--danger, #c44); font-size:13px;">Could not load leaderboard.</td></tr>';
+        return;
+      }
+
       if (!data.length) {
         tbody.innerHTML = '<tr><td colspan="6" style="padding:24px; color:var(--muted); font-size:13px;">No players found.</td></tr>';
         return;

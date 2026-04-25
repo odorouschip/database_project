@@ -234,27 +234,97 @@ def show_matchmaking():
 
     return render_template('matchmaking.html')
 
+def _query_leaderboard_rows(cursor, where_username_like):
+    """
+    All registered players, one row each. Wins/losses and win% come from completed Game rows
+    (same team/winner rules as the DB trigger) — not from Stats sums, so duplicate Player_Stats
+    links or out-of-sync Stats cannot skew win rate.
+    """
+    where_sql = "WHERE p.username LIKE %s" if where_username_like is not None else ""
+    params = (f"%{where_username_like}%",) if where_username_like is not None else ()
+    query = f"""
+    SELECT
+        t.player_id,
+        t.username,
+        t.rating,
+        RANK() OVER (ORDER BY t.wins DESC, t.rating DESC) AS `rank`,
+        t.wins,
+        t.losses,
+        t.win_rate
+    FROM (
+        SELECT
+            p.player_id,
+            p.username,
+            p.rating,
+            COALESCE(m.wins, 0) AS wins,
+            COALESCE(m.losses, 0) AS losses,
+            CASE
+                WHEN COALESCE(m.wins, 0) + COALESCE(m.losses, 0) = 0 THEN 0.00
+                ELSE ROUND(
+                    100.0 * COALESCE(m.wins, 0)
+                    / (COALESCE(m.wins, 0) + COALESCE(m.losses, 0)),
+                    2
+                )
+            END AS win_rate
+        FROM Player p
+        LEFT JOIN (
+            SELECT
+                gp.player_id,
+                SUM(
+                    CASE
+                        WHEN (
+                            CASE
+                                WHEN gp.seat_position IN (1, 3) THEN 1
+                                ELSE 2
+                            END
+                        ) = g.winning_team_number
+                        THEN 1
+                        ELSE 0
+                    END
+                ) AS wins,
+                SUM(
+                    CASE
+                        WHEN (
+                            CASE
+                                WHEN gp.seat_position IN (1, 3) THEN 1
+                                ELSE 2
+                            END
+                        ) <> g.winning_team_number
+                        THEN 1
+                        ELSE 0
+                    END
+                ) AS losses
+            FROM Game_Player gp
+            INNER JOIN Game g ON g.game_id = gp.game_id
+            WHERE g.status = 'completed' AND g.winning_team_number IS NOT NULL
+            GROUP BY gp.player_id
+        ) m ON m.player_id = p.player_id
+        {where_sql}
+    ) t
+    ORDER BY `rank` ASC
+    """
+    cursor.execute(query, params)
+
+
 @app.route('/api/leaderboard', methods=['GET'])
 def get_leaderboard():
-    search_query = request.args.get('search', '')
+    search_query = (request.args.get("search") or "").strip()
     conn = get_db_connection()
     
     if not conn:
         return jsonify({"error": "Database connection failed"}), 500
-        
+
     cursor = conn.cursor(dictionary=True)
-    
-    if search_query:
-        query = "SELECT * FROM Lobby WHERE username LIKE %s ORDER BY `rank` ASC"
-        cursor.execute(query, (f"%{search_query}%",))
-    else:
-        query = "SELECT * FROM Lobby ORDER BY `rank` ASC LIMIT 50"
-        cursor.execute(query)
-        
-    results = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    
+    try:
+        if search_query:
+            _query_leaderboard_rows(cursor, search_query)
+        else:
+            _query_leaderboard_rows(cursor, None)
+        results = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
+
     return jsonify(results)
 
 @app.route('/api/open_games', methods=['GET'])
@@ -593,6 +663,68 @@ def play_game_screen(game_id):
 
     return render_template("play.html", game_id=game_id, error=None)
 
+def _apply_match_completion_effects(cursor, game_id, winning_team_number):
+    """
+    When a game is marked completed, update Stats (wins, losses, average) and Player.rating
+    the same way as the historical DB trigger, so it works even if triggers are not installed.
+    """
+    cursor.execute(
+        """
+        UPDATE Stats s
+        JOIN Player_Stats ps ON ps.stats_id = s.stats_id
+        JOIN Game_Player gp ON gp.player_id = ps.player_id
+        JOIN Team t ON t.game_id = gp.game_id
+            AND t.team_number = (CASE WHEN gp.seat_position IN (1, 3) THEN 1 ELSE 2 END)
+        SET s.average_score =
+            (s.average_score * (s.wins + s.losses) + t.score) / (s.wins + s.losses + 1)
+        WHERE gp.game_id = %s
+        """,
+        (game_id,),
+    )
+    cursor.execute(
+        """
+        UPDATE Stats s
+        JOIN Player_Stats ps ON ps.stats_id = s.stats_id
+        JOIN Game_Player gp ON gp.player_id = ps.player_id
+        SET s.wins = s.wins + 1
+        WHERE gp.game_id = %s
+          AND (CASE WHEN gp.seat_position IN (1, 3) THEN 1 ELSE 2 END) = %s
+        """,
+        (game_id, winning_team_number),
+    )
+    cursor.execute(
+        """
+        UPDATE Stats s
+        JOIN Player_Stats ps ON ps.stats_id = s.stats_id
+        JOIN Game_Player gp ON gp.player_id = ps.player_id
+        SET s.losses = s.losses + 1
+        WHERE gp.game_id = %s
+          AND (CASE WHEN gp.seat_position IN (1, 3) THEN 1 ELSE 2 END) <> %s
+        """,
+        (game_id, winning_team_number),
+    )
+    cursor.execute(
+        """
+        UPDATE Player p
+        JOIN Game_Player gp ON gp.player_id = p.player_id
+        SET p.rating = p.rating + 25
+        WHERE gp.game_id = %s
+          AND (CASE WHEN gp.seat_position IN (1, 3) THEN 1 ELSE 2 END) = %s
+        """,
+        (game_id, winning_team_number),
+    )
+    cursor.execute(
+        """
+        UPDATE Player p
+        JOIN Game_Player gp ON gp.player_id = p.player_id
+        SET p.rating = GREATEST(p.rating - 25, 0)
+        WHERE gp.game_id = %s
+          AND (CASE WHEN gp.seat_position IN (1, 3) THEN 1 ELSE 2 END) <> %s
+        """,
+        (game_id, winning_team_number),
+    )
+
+
 @app.route("/api/match/<int:game_id>/complete", methods=["POST"])
 def complete_match(game_id):
     if not logged_in():
@@ -668,6 +800,16 @@ def complete_match(game_id):
             """,
             (winning_team_number, game_id),
         )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify(
+                {
+                    "status": "error",
+                    "message": "Match was already completed or is no longer active.",
+                }
+            ), 400
+
+        _apply_match_completion_effects(cursor, game_id, winning_team_number)
         conn.commit()
         return jsonify(
             {"status": "success", "message": "Match saved.", "game_id": game_id}
