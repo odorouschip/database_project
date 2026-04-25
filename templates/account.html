@@ -1,312 +1,246 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Account</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goita — Account</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h2>Account</h2>
+  <nav class="nav">
+    <a class="nav-logo" href="/matchmaking">GO<span>I</span>TA</a>
+    <div class="nav-links">
+      <a href="/matchmaking">Play</a>
+      <a href="/leaderboard">Leaderboard</a>
+      <a href="/account" class="active">Account</a>
+    </div>
+  </nav>
 
-    <p>
-        Logged in as: <span id="usernameDisplay">Loading...</span>
-    </p>
-
-    <br>
-
-    <button id="showUsernameFormButton">
-        Change Username
-    </button>
-
-    <div id="usernameFormContainer" style="display:none; margin-top:12px;">
-        <input
-            type="text"
-            id="newUsername"
-            placeholder="Enter new username"
-            required
-        >
-        <button id="submitUsernameChange">
-            Submit Username Change
-        </button>
+  <div class="page">
+    <div class="flex-between" style="margin-bottom:28px; flex-wrap:wrap; gap:12px;">
+      <div>
+        <div class="page-title" id="usernameDisplay">Loading…</div>
+        <div class="page-sub mb-0">Your account settings and match history</div>
+      </div>
+      <button id="logoutButton" class="btn btn-ghost btn-sm">Sign out</button>
     </div>
 
-    <br><br>
+    <!-- Change Username -->
+    <div class="card">
+      <button class="section-toggle" id="toggleUsername">
+        <span>Change Username</span>
+        <span class="chevron">▼</span>
+      </button>
+      <div class="section-body" id="bodyUsername">
+        <div class="field" style="max-width:340px;">
+          <label class="field-label" for="newUsername">New Username</label>
+          <input type="text" id="newUsername" placeholder="Enter new username">
+        </div>
+        <button id="submitUsernameChange" class="btn btn-primary btn-sm">Save Username</button>
+      </div>
+    </div>
 
-    <button id="showPasswordFormButton">
-        Change Password
-    </button>
-
-    <div id="passwordFormContainer" style="display:none; margin-top:12px;">
-        <ul style="margin-bottom:10px;">
-            <li>At least 8 characters</li>
-            <li>Contains an uppercase letter</li>
-            <li>Contains a lowercase letter</li>
-            <li>Contains a number</li>
-            <li>Contains a special character</li>
+    <!-- Change Password -->
+    <div class="card">
+      <button class="section-toggle" id="togglePassword">
+        <span>Change Password</span>
+        <span class="chevron">▼</span>
+      </button>
+      <div class="section-body" id="bodyPassword">
+        <ul class="req-list" id="reqList" style="margin-bottom:16px;">
+          <li id="req-length">At least 8 characters</li>
+          <li id="req-upper">Contains an uppercase letter</li>
+          <li id="req-lower">Contains a lowercase letter</li>
+          <li id="req-number">Contains a number</li>
+          <li id="req-special">Contains a special character</li>
         </ul>
-
-        <input
-            type="password"
-            id="newPassword"
-            placeholder="Enter new password"
-            required
-        >
-        <br><br>
-
-        <input
-            type="password"
-            id="confirmPassword"
-            placeholder="Confirm new password"
-            required
-        >
-        <br><br>
-
-        <button id="submitPasswordChange">
-            Submit Password Change
-        </button>
+        <div class="field" style="max-width:340px;">
+          <label class="field-label" for="newPassword">New Password</label>
+          <input type="password" id="newPassword" placeholder="New password" autocomplete="new-password">
+        </div>
+        <div class="field" style="max-width:340px;">
+          <label class="field-label" for="confirmPassword">Confirm Password</label>
+          <input type="password" id="confirmPassword" placeholder="Repeat new password" autocomplete="new-password">
+        </div>
+        <button id="submitPasswordChange" class="btn btn-primary btn-sm">Save Password</button>
+      </div>
     </div>
 
-    <br><br>
+    <!-- Danger Zone -->
+    <div class="card">
+      <div class="flex-between" style="flex-wrap:wrap; gap:12px;">
+        <div>
+          <div style="font-size:14px; font-weight:500;">Delete Account</div>
+          <div class="small text-muted mt-4">This action is permanent and cannot be undone.</div>
+        </div>
+        <button id="deleteAccountButton" class="btn btn-danger btn-sm">Delete Account</button>
+      </div>
+    </div>
 
-    <button id="deleteAccountButton">
-        Delete Account
-    </button>
-    
-    <button id="logoutButton">
-        Logout
-    </button>
+    <p id="error" class="alert alert-error"></p>
+    <p id="message" class="alert alert-success"></p>
 
-    <p id="error" style="color:red;"></p>
-    <p id="message" style="color:green;"></p>
+    <!-- Past Matches -->
+    <div style="margin-top:36px;">
+      <div class="page-title" style="font-size:17px; margin-bottom:16px;">Match History</div>
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div id="pastMatchesContainer">
+          <div style="padding:20px; color:var(--muted); font-size:13px;">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    <h3 style="margin-top:24px;">Past Matches</h3>
-    <div id="pastMatchesContainer">Loading...</div>
+  <script>
+    // Toggle sections
+    function makeToggle(btnId, bodyId) {
+      const btn  = document.getElementById(btnId);
+      const body = document.getElementById(bodyId);
+      btn.addEventListener("click", function() {
+        const open = body.classList.toggle("open");
+        btn.classList.toggle("open", open);
+      });
+    }
+    makeToggle("toggleUsername", "bodyUsername");
+    makeToggle("togglePassword", "bodyPassword");
 
-    <script>
-        async function loadAccountInfo() {
-            const res = await fetch("/api/account", {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json"
-                }
-            });
+    // Password requirements live check
+    const pwdInput = document.getElementById("newPassword");
+    const reqChecks = {
+      "req-length":  p => p.length >= 8,
+      "req-upper":   p => /[A-Z]/.test(p),
+      "req-lower":   p => /[a-z]/.test(p),
+      "req-number":  p => /[0-9]/.test(p),
+      "req-special": p => /[^A-Za-z0-9]/.test(p),
+    };
+    pwdInput.addEventListener("input", function() {
+      const p = pwdInput.value;
+      Object.entries(reqChecks).forEach(([id, fn]) => {
+        document.getElementById(id).classList.toggle("met", fn(p));
+      });
+    });
 
-            if (!res.ok) {
-                document.getElementById("error").innerText =
-                    "Could not load account info.";
-                return;
-            }
+    function setMsg(msg, isError) {
+      document.getElementById("error").innerText   = isError ? msg : "";
+      document.getElementById("message").innerText = isError ? "" : msg;
+    }
 
-            const data = await res.json();
+    // Load account info
+    async function loadAccountInfo() {
+      const res = await fetch("/api/account", { headers: { "Content-Type": "application/json" } });
+      if (!res.ok) { setMsg("Could not load account info.", true); return; }
+      const data = await res.json();
+      if (!data.logged_in) { window.location.href = "/login"; return; }
+      document.getElementById("usernameDisplay").innerText = data.username;
+    }
 
-            if (!data.logged_in) {
-                window.location.href = "/login";
-                return;
-            }
+    // Change username
+    document.getElementById("submitUsernameChange").addEventListener("click", async function() {
+      setMsg("", false);
+      const newUsername = document.getElementById("newUsername").value;
+      const res = await fetch("/api/change_username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: newUsername })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMsg("Username updated successfully.", false);
+        document.getElementById("usernameDisplay").innerText = newUsername;
+        document.getElementById("newUsername").value = "";
+        document.getElementById("bodyUsername").classList.remove("open");
+        document.getElementById("toggleUsername").classList.remove("open");
+      } else {
+        setMsg(data.message || "Failed to change username.", true);
+      }
+    });
 
-            document.getElementById("usernameDisplay").innerText =
-                data.username;
-        }
+    // Change password
+    document.getElementById("submitPasswordChange").addEventListener("click", async function() {
+      setMsg("", false);
+      const password = document.getElementById("newPassword").value;
+      const confirm  = document.getElementById("confirmPassword").value;
+      if (password !== confirm) { setMsg("Passwords do not match.", true); return; }
+      if (!Object.values(reqChecks).every(fn => fn(password))) {
+        setMsg("Password does not meet all requirements.", true); return;
+      }
+      const res = await fetch("/api/change_password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMsg("Password updated successfully.", false);
+        document.getElementById("newPassword").value = "";
+        document.getElementById("confirmPassword").value = "";
+        document.getElementById("bodyPassword").classList.remove("open");
+        document.getElementById("togglePassword").classList.remove("open");
+      } else {
+        setMsg(data.message || "Failed to change password.", true);
+      }
+    });
 
-        document.getElementById("showUsernameFormButton").addEventListener(
-            "click",
-            function () {
-                const form = document.getElementById("usernameFormContainer");
-                form.style.display =
-                    form.style.display === "none" ? "block" : "none";
-            }
-        );
+    // Delete account
+    document.getElementById("deleteAccountButton").addEventListener("click", async function() {
+      if (!confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
+      const res = await fetch("/api/delete_account", {
+        method: "POST", headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (res.ok) { window.location.href = "/login?deleted=1"; return; }
+      setMsg(data.message || "Failed to delete account.", true);
+    });
 
-        document.getElementById("showPasswordFormButton").addEventListener(
-            "click",
-            function () {
-                const form = document.getElementById("passwordFormContainer");
-                form.style.display =
-                    form.style.display === "none" ? "block" : "none";
-            }
-        );
+    // Logout
+    document.getElementById("logoutButton").addEventListener("click", async function() {
+      const res = await fetch("/api/logout", { method: "POST", headers: { "Content-Type": "application/json" } });
+      if (res.ok) { window.location.href = "/login?logout=1"; return; }
+      setMsg("Failed to log out.", true);
+    });
 
-        document.getElementById("submitUsernameChange").addEventListener(
-            "click",
-            async function () {
-                document.getElementById("error").innerText = "";
-                document.getElementById("message").innerText = "";
+    // Past matches
+    async function loadPastMatches() {
+      const container = document.getElementById("pastMatchesContainer");
+      const res = await fetch("/api/past_matches");
+      if (!res.ok) { container.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;">Could not load match history.</div>'; return; }
+      const matches = await res.json();
+      if (matches.length === 0) {
+        container.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;">No matches played yet.</div>';
+        return;
+      }
 
-                const newUsername =
-                    document.getElementById("newUsername").value;
+      let rows = `<table class="data-table">
+        <thead><tr>
+          <th>Date</th><th>With</th><th>vs</th><th>Score</th><th>Result</th><th></th>
+        </tr></thead><tbody>`;
 
-                const res = await fetch("/api/change_username", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ username: newUsername })
-                });
+      matches.forEach(function(m) {
+        const date = m.ended_time ? m.ended_time.split("T")[0] : "—";
+        const teammate = m.teammate ? m.teammate.username : "(none)";
+        const opps = m.opponents.map(o => o.username).join(" & ");
+        const badge = m.result === "Win"
+          ? '<span class="badge badge-win">Win</span>'
+          : '<span class="badge badge-loss">Loss</span>';
+        rows += `<tr>
+          <td class="text-muted small">${date}</td>
+          <td>${teammate}</td>
+          <td class="text-muted">${opps}</td>
+          <td>${m.my_score} – ${m.opp_score}</td>
+          <td>${badge}</td>
+          <td class="small">
+            <a href="/match/${m.game_id}/summary" style="color:var(--accent);text-decoration:none;margin-right:10px;">Summary</a>
+            <a href="/match/${m.game_id}/replay"  style="color:var(--muted);text-decoration:none;">Replay</a>
+          </td>
+        </tr>`;
+      });
 
-                const data = await res.json();
+      rows += "</tbody></table>";
+      container.innerHTML = rows;
+    }
 
-                if (res.ok) {
-                    document.getElementById("message").innerText =
-                        "Username changed successfully.";
-                    document.getElementById("usernameDisplay").innerText =
-                        newUsername;
-                    document.getElementById("newUsername").value = "";
-                    document.getElementById("usernameFormContainer").style.display =
-                        "none";
-                    return;
-                }
-
-                document.getElementById("error").innerText =
-                    data.message || "Failed to change username.";
-            }
-        );
-
-        document.getElementById("submitPasswordChange").addEventListener(
-            "click",
-            async function () {
-                document.getElementById("error").innerText = "";
-                document.getElementById("message").innerText = "";
-
-                const password =
-                    document.getElementById("newPassword").value;
-                const confirm =
-                    document.getElementById("confirmPassword").value;
-
-                if (password !== confirm) {
-                    document.getElementById("error").innerText =
-                        "Passwords do not match.";
-                    return;
-                }
-
-                const valid =
-                    password.length >= 8 &&
-                    /[A-Z]/.test(password) &&
-                    /[a-z]/.test(password) &&
-                    /[0-9]/.test(password) &&
-                    /[^A-Za-z0-9]/.test(password);
-
-                if (!valid) {
-                    document.getElementById("error").innerText =
-                        "Password does not meet requirements.";
-                    return;
-                }
-
-                const res = await fetch("/api/change_password", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ password: password })
-                });
-
-                const data = await res.json();
-
-                if (res.ok) {
-                    document.getElementById("message").innerText =
-                        "Password changed successfully.";
-                    document.getElementById("newPassword").value = "";
-                    document.getElementById("confirmPassword").value = "";
-                    document.getElementById("passwordFormContainer").style.display =
-                        "none";
-                    return;
-                }
-
-                document.getElementById("error").innerText =
-                    data.message || "Failed to change password.";
-            }
-        );
-
-        document.getElementById("deleteAccountButton").addEventListener(
-            "click",
-            async function () {
-                const confirmed = confirm(
-                    "Are you sure you want to delete your account?"
-                );
-
-                if (!confirmed) {
-                    return;
-                }
-
-                const res = await fetch("/api/delete_account", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    }
-                });
-
-                const data = await res.json();
-
-                if (res.ok) {
-                    window.location.href = "/login?deleted=1";
-                    return;
-                }
-
-                document.getElementById("error").innerText =
-                    data.message || "Failed to delete account.";
-            }
-        );
-
-        document.getElementById("logoutButton").addEventListener(
-            "click",
-            async function () {
-                const res = await fetch("/api/logout", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    }
-                });
-
-                if (res.ok) {
-                    window.location.href = "/login?logout=1";
-                    return;
-                }
-
-                document.getElementById("error").innerText =
-                    "Failed to log out.";
-            }
-        );
-
-        async function loadPastMatches() {
-            const container = document.getElementById("pastMatchesContainer");
-
-            const res = await fetch("/api/past_matches");
-            if (!res.ok) {
-                container.innerText = "Could not load past matches.";
-                return;
-            }
-
-            const matches = await res.json();
-
-            if (matches.length === 0) {
-                container.innerText = "No past matches yet.";
-                return;
-            }
-
-            container.innerHTML = "";
-            matches.forEach(function (m) {
-                const dateStr = m.ended_time ? m.ended_time.split("T")[0] : "";
-                const teammateName = m.teammate ? m.teammate.username : "(none)";
-                const opponentNames = m.opponents
-                    .map(function (o) { return o.username; })
-                    .join(" & ");
-
-                const row = document.createElement("div");
-                row.style.border = "1px solid #ccc";
-                row.style.padding = "8px";
-                row.style.marginBottom = "6px";
-                row.innerHTML =
-                    "<strong>with " + teammateName + " vs " + opponentNames + "</strong>" +
-                    " &nbsp; " + dateStr +
-                    " &nbsp; " + m.my_score + "-" + m.opp_score +
-                    " &nbsp; <span style='color:" +
-                    (m.result === "Win" ? "green" : "red") + ";'>" +
-                    m.result + "</span>" +
-                    " &nbsp; <a href='/match/" + m.game_id + "/summary'>View Summary</a>" +
-                    " &nbsp; <a href='/match/" + m.game_id + "/replay'>View Replay</a>";
-                container.appendChild(row);
-            });
-        }
-
-        loadAccountInfo();
-        loadPastMatches();
-    </script>
+    loadAccountInfo();
+    loadPastMatches();
+  </script>
 </body>
 </html>
