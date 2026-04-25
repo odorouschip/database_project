@@ -1,107 +1,93 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Create Account</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goita — Create Account</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h2>Create Account</h2>
+  <div class="auth-wrap">
+    <div class="auth-card" style="max-width:420px;">
+      <div class="auth-logo">GO<span>I</span>TA</div>
 
-    <h3>Password requirements</h3>
-    <ul id="requirements">
-        <li id="req-length">At least 8 characters</li>
-        <li id="req-letter">Contains a letter</li>
-        <li id="req-number">Contains a number</li>
-        <li id="req-upper">Contains an uppercase letter</li>
-        <li id="req-special">Contains a special character</li>
-    </ul>
+      <form id="createForm">
+        <div class="field">
+          <label class="field-label" for="username">Username</label>
+          <input type="text" id="username" placeholder="Choose a username" required autocomplete="username">
+        </div>
 
-    <form id="createForm">
-        <input type="text" id="username" placeholder="Username" required>
-        <br><br>
+        <div class="field">
+          <label class="field-label" for="password">Password</label>
+          <input type="password" id="password" placeholder="Create a password" required autocomplete="new-password">
+        </div>
 
-        <input type="password" id="password" placeholder="Password" required>
-        <br><br>
+        <ul class="req-list" id="reqList" style="margin-bottom:16px;">
+          <li id="req-length">At least 8 characters</li>
+          <li id="req-upper">Contains an uppercase letter</li>
+          <li id="req-lower">Contains a lowercase letter</li>
+          <li id="req-number">Contains a number</li>
+          <li id="req-special">Contains a special character (!@#$%^&*)</li>
+        </ul>
 
-        <input type="password" id="confirm" placeholder="Confirm Password" required>
-        <br><br>
+        <div class="field">
+          <label class="field-label" for="confirm">Confirm Password</label>
+          <input type="password" id="confirm" placeholder="Repeat your password" required autocomplete="new-password">
+        </div>
 
-        <button type="submit">Create Account</button>
-    </form>
+        <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+      </form>
 
-    <p>
-        Already have an account?
-        <a href="/login">
-            <button type="button">Back to login</button>
-        </a>
-    </p>
-    <p id="error" style="color:red;"></p>
+      <p id="error" class="alert alert-error"></p>
 
-    <script>
-        document.getElementById("createForm").addEventListener("submit", async function(e) {
-            e.preventDefault();
+      <div class="auth-footer">
+        Already have an account? <a href="/login">Sign in</a>
+      </div>
+    </div>
+  </div>
 
-            const username = document.getElementById("username").value;
-            const password = document.getElementById("password").value;
-            const confirm  = document.getElementById("confirm").value;
-            const errorEl = document.getElementById("error");
-            errorEl.innerText = "";
+  <script>
+    const pwdInput = document.getElementById("password");
+    const checks = {
+      "req-length":  p => p.length >= 8,
+      "req-upper":   p => /[A-Z]/.test(p),
+      "req-lower":   p => /[a-z]/.test(p),
+      "req-number":  p => /[0-9]/.test(p),
+      "req-special": p => /[!@#$%^&*]/.test(p),
+    };
 
-            if (password !== confirm) {
-                document.getElementById("error").innerText = "Passwords do not match";
-                return;
-            }
+    pwdInput.addEventListener("input", function() {
+      const p = pwdInput.value;
+      Object.entries(checks).forEach(([id, fn]) => {
+        document.getElementById(id).classList.toggle("met", fn(p));
+      });
+    });
 
-            if (password.length < 8){
-                errorEl.innerText = "Password must be at least 8 characters";
-                return;
-            }
+    document.getElementById("createForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const confirm  = document.getElementById("confirm").value;
+      const errorEl  = document.getElementById("error");
+      errorEl.innerText = "";
 
-            if (!/[a-zA-Z]/.test(password)){
-                errorEl.innerText = "Password must contain a letter";
-                return
-            }
-            if (!/[0-9]/.test(password)) {
-                errorEl.innerText = "Password must contain a number";
-                return;
-                }
-            if (!/[A-Z]/.test(password)) {
-                errorEl.innerText = "Password must contain an uppercase letter";
-                return;
-            }
+      if (password !== confirm) { errorEl.innerText = "Passwords do not match."; return; }
+      if (!Object.values(checks).every(fn => fn(password))) {
+        errorEl.innerText = "Password does not meet all requirements."; return;
+      }
 
-            if (!/[!@#$%^&*]/.test(password)) {
-                errorEl.innerText = "Password must contain a special character";
-                return;
-            }
-		
-	 
-            const res = await fetch("/api/create_account", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ username, password })
-            });
-		
-	    const data = await res.json();
-	    
-	    if (res.status === 409) {
-		document.getElementById("error").innerText = "Username already exists";
-		return;
-	    }
-	    
-	    if (res.status === 400){
-		document.getElementById("error").innerText = "Invalid password passed to backend. Do not do this again. Please try again."
-		return;
-	    }
+      const res = await fetch("/api/create_account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
 
-            if (res.ok) {
-                window.location.href = "/login?created=1";
-                return;
-            }
-
-            document.getElementById("error").innerText = "Failed to create account";
-        });
-    </script>
+      const data = await res.json();
+      if (res.status === 409) { errorEl.innerText = "Username already taken."; return; }
+      if (res.status === 400) { errorEl.innerText = "Invalid password format."; return; }
+      if (res.ok) { window.location.href = "/login?created=1"; return; }
+      errorEl.innerText = data.message || "Failed to create account.";
+    });
+  </script>
 </body>
 </html>
