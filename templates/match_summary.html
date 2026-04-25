@@ -13,6 +13,7 @@
       <a href="/matchmaking">Play</a>
       <a href="/leaderboard">Leaderboard</a>
       <a href="/account">Account</a>
+      <a href="#" class="nav-logout" id="navLogout">Sign out</a>
     </div>
   </nav>
 
@@ -89,6 +90,12 @@
     }
 
     loadSummary();
+
+    document.getElementById("navLogout").addEventListener("click", async function(e) {
+      e.preventDefault();
+      const res = await fetch("/api/logout", { method: "POST", headers: { "Content-Type": "application/json" } });
+      if (res.ok) window.location.href = "/login?logout=1";
+    });
   </script>
 </body>
 </html>
