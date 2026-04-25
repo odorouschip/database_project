@@ -139,6 +139,7 @@ CREATE VIEW Lobby AS
 SELECT
     p.player_id,
     p.username,
+    p.rating,
     RANK() OVER (ORDER BY COALESCE(s.wins, 0) DESC, p.rating DESC) AS `rank`,
     COALESCE(s.wins, 0) AS wins,
     COALESCE(s.losses, 0) AS losses,
