@@ -41,7 +41,7 @@ def home():
     if not logged_in():
         return redirect_to_login()
 
-    return f"The Goita Online Backend is running successfully! {session['username']} is logged in."
+    return redirect(url_for('show_matchmaking'))
 
 
 @app.route('/login')
@@ -77,7 +77,7 @@ def check_user():
 
         session['player_id'] = player_id
         session['username'] = username
-        return redirect(url_for('home'))
+        return redirect(url_for('show_matchmaking'))
 
     
     cursor.close()
