@@ -1,62 +1,77 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Goita Online - Leaderboard</title>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        table { border-collapse: collapse; width: 50%; margin-top: 20px; }
-        th, td { border: 1px solid black; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goita — Leaderboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+  <nav class="nav">
+    <a class="nav-logo" href="/matchmaking">GO<span>I</span>TA</a>
+    <div class="nav-links">
+      <a href="/matchmaking">Play</a>
+      <a href="/leaderboard" class="active">Leaderboard</a>
+      <a href="/account">Account</a>
+    </div>
+  </nav>
 
-    <h2>Goita Leaderboard</h2>
-    
-    <input type="text" id="searchInput" placeholder="Search username..." onkeyup="fetchLeaderboard()">
+  <div class="page">
+    <div class="page-title">Leaderboard</div>
+    <div class="page-sub">Top players ranked by win rate</div>
 
-    <table>
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="searchInput" placeholder="Search player…" oninput="fetchLeaderboard()">
+    </div>
+
+    <div class="card" style="padding:0; overflow:hidden;">
+      <table class="data-table" id="leaderboardTable">
         <thead>
-            <tr>
-                <th>Rank</th>
-                <th>Username</th>
-                <th>Wins</th>
-                <th>Losses</th>
-                <th>Win Rate</th>
-            </tr>
+          <tr>
+            <th style="width:52px;">Rank</th>
+            <th>Player</th>
+            <th>Wins</th>
+            <th>Losses</th>
+            <th>Win Rate</th>
+          </tr>
         </thead>
         <tbody id="leaderboardBody">
-            </tbody>
-    </table>
+          <tr><td colspan="5" style="padding:24px; color:var(--muted); font-size:13px;">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-    <script>
-        // This function calls your Python API!
-        async function fetchLeaderboard() {
-            const searchQuery = document.getElementById('searchInput').value;
-            
-            // Hit the API endpoint you just built
-            const response = await fetch(`/api/leaderboard?search=${searchQuery}`);
-            const data = await response.json();
-            
-            const tbody = document.getElementById('leaderboardBody');
-            tbody.innerHTML = ''; // Clear the old data
-            
-            // Loop through the JSON data and create table rows
-            data.forEach(player => {
-                const row = `<tr>
-                    <td>${player.rank}</td>
-                    <td>${player.username}</td>
-                    <td>${player.wins}</td>
-                    <td>${player.losses}</td>
-                    <td>${player.win_rate}%</td>
-                </tr>`;
-                tbody.innerHTML += row;
-            });
-        }
+  <script>
+    async function fetchLeaderboard() {
+      const q = document.getElementById("searchInput").value;
+      const res = await fetch("/api/leaderboard?search=" + encodeURIComponent(q));
+      const data = await res.json();
+      const tbody = document.getElementById("leaderboardBody");
 
-        // Load the top 50 players as soon as the page opens
-        window.onload = fetchLeaderboard;
-    </script>
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:24px; color:var(--muted); font-size:13px;">No players found.</td></tr>';
+        return;
+      }
 
+      tbody.innerHTML = data.map(function(p) {
+        let badgeClass = "";
+        if (p.rank === 1) badgeClass = "gold";
+        else if (p.rank === 2) badgeClass = "silver";
+        else if (p.rank === 3) badgeClass = "bronze";
+
+        return `<tr>
+          <td><span class="rank-badge ${badgeClass}">${p.rank}</span></td>
+          <td style="font-weight:500;">${p.username}</td>
+          <td class="text-win">${p.wins}</td>
+          <td class="text-muted">${p.losses}</td>
+          <td style="font-weight:500;">${p.win_rate}%</td>
+        </tr>`;
+      }).join("");
+    }
+
+    window.onload = fetchLeaderboard;
+  </script>
 </body>
 </html>
