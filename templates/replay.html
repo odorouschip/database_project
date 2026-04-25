@@ -1,98 +1,134 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Match Replay</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goita — Replay</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h2>Match Replay</h2>
-    <a href="/account">Back to Account</a>
-    | <a href="/match/{{ game_id }}/summary">View Summary</a>
+  <nav class="nav">
+    <a class="nav-logo" href="/matchmaking">GO<span>I</span>TA</a>
+    <div class="nav-links">
+      <a href="/matchmaking">Play</a>
+      <a href="/leaderboard">Leaderboard</a>
+      <a href="/account">Account</a>
+    </div>
+  </nav>
 
-    <div id="replay" data-game-id="{{ game_id }}">Loading...</div>
+  <div class="page" id="replay" data-game-id="{{ game_id }}">
 
-    <script>
-        const gameId = document.getElementById("replay").dataset.gameId;
-        let replayData = null;
-        let currentIndex = 0;
+    <div style="margin-bottom:24px; font-size:13px; color:var(--muted); display:flex; gap:16px; flex-wrap:wrap;">
+      <a href="/account" style="color:var(--muted); text-decoration:none;">← Account</a>
+      <a id="summaryLink" href="#" style="color:var(--accent); text-decoration:none;">View Summary →</a>
+    </div>
 
-        async function loadReplay() {
-            const res = await fetch("/api/match/" + gameId + "/replay");
-            const div = document.getElementById("replay");
+    <div class="page-title" style="margin-bottom:4px;">Match Replay</div>
+    <div class="page-sub" id="gameSubtitle">Loading…</div>
 
-            if (!res.ok) {
-                div.innerText = "Could not load replay.";
-                return;
-            }
+    <div id="replayContent">
+      <div class="card" style="color:var(--muted); font-size:13px;">Loading replay…</div>
+    </div>
+  </div>
 
-            replayData = await res.json();
+  <script>
+    const gameId = document.getElementById("replay").dataset.gameId;
+    document.getElementById("summaryLink").href = "/match/" + gameId + "/summary";
 
-            if (replayData.moves.length === 0) {
-                div.innerHTML =
-                    "<p>Game #" + replayData.game.game_id + "</p>" +
-                    "<p>No moves recorded for this match.</p>" +
-                    "<button onclick='exportJSON()'>Export JSON</button>";
-                return;
-            }
+    let replayData   = null;
+    let currentIndex = 0;
 
-            renderControls();
-            renderMove();
-        }
+    // Persist position across refreshes
+    const storageKey = "replay_pos_" + gameId;
 
-        function renderControls() {
-            const div = document.getElementById("replay");
-            div.innerHTML =
-                "<p>Game #" + replayData.game.game_id +
-                " &nbsp; Status: " + replayData.game.status + "</p>" +
-                "<p id='moveCounter'></p>" +
-                "<div id='moveDisplay'></div>" +
-                "<button onclick='prevMove()'>Previous</button> " +
-                "<button onclick='nextMove()'>Next</button> " +
-                "<button onclick='exportJSON()'>Export JSON</button>";
-        }
+    async function loadReplay() {
+      const res = await fetch("/api/match/" + gameId + "/replay");
+      const container = document.getElementById("replayContent");
 
-        function renderMove() {
-            const mv = replayData.moves[currentIndex];
-            const total = replayData.moves.length;
+      if (!res.ok) {
+        container.innerHTML = '<div class="card" style="color:var(--muted);">Could not load replay.</div>';
+        return;
+      }
 
-            document.getElementById("moveCounter").innerText =
-                "Move " + (currentIndex + 1) + " of " + total;
+      replayData = await res.json();
+      document.getElementById("gameSubtitle").innerText =
+        "Game #" + replayData.game.game_id + "  ·  " + replayData.game.status;
 
-            const tiles = mv.tiles
-                .map(function (t) { return t.tile_name + " (" + t.score + ")"; })
-                .join(", ");
+      if (replayData.moves.length === 0) {
+        container.innerHTML = `<div class="card" style="color:var(--muted); font-size:13px;">
+          No moves recorded for this match.
+          <button class="btn btn-ghost btn-sm" style="margin-top:16px;" onclick="exportJSON()">Export JSON</button>
+        </div>`;
+        return;
+      }
 
-            document.getElementById("moveDisplay").innerHTML =
-                "<p>Round " + mv.round_number + ", Order " + mv.order_played + "</p>" +
-                "<p>Player: " + mv.username + " (seat " + mv.seat_position + ")</p>" +
-                "<p>Tiles played: " + tiles + "</p>";
-        }
+      // Restore saved position
+      const saved = parseInt(localStorage.getItem(storageKey) || "0", 10);
+      currentIndex = (saved >= 0 && saved < replayData.moves.length) ? saved : 0;
 
-        function nextMove() {
-            if (currentIndex < replayData.moves.length - 1) {
-                currentIndex++;
-                renderMove();
-            }
-        }
+      renderReplay();
+    }
 
-        function prevMove() {
-            if (currentIndex > 0) {
-                currentIndex--;
-                renderMove();
-            }
-        }
+    function renderReplay() {
+      const total = replayData.moves.length;
+      const mv    = replayData.moves[currentIndex];
 
-        function exportJSON() {
-            const dataStr = JSON.stringify(replayData, null, 2);
-            const blob = new Blob([dataStr], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "match_" + gameId + "_replay.json";
-            a.click();
-            URL.revokeObjectURL(url);
-        }
+      localStorage.setItem(storageKey, currentIndex);
 
-        loadReplay();
-    </script>
+      const tiles = mv.tiles.map(function(t) {
+        return `<div class="tile-chip">${t.tile_name} <span class="text-muted">${t.score}pt</span></div>`;
+      }).join("");
+
+      // Build round/move progress bar segments
+      const barPct = ((currentIndex + 1) / total * 100).toFixed(1);
+
+      document.getElementById("replayContent").innerHTML = `
+        <div class="card" style="margin-bottom:14px;">
+          <div class="move-nav">
+            <button class="btn btn-ghost btn-sm" onclick="prevMove()" ${currentIndex === 0 ? "disabled" : ""}>← Prev</button>
+            <div class="move-counter">Move ${currentIndex + 1} of ${total}</div>
+            <button class="btn btn-ghost btn-sm" onclick="nextMove()" ${currentIndex === total - 1 ? "disabled" : ""}>Next →</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportJSON()">Export JSON</button>
+          </div>
+          <!-- progress bar -->
+          <div style="height:3px; background:var(--border); border-radius:2px; margin-bottom:20px;">
+            <div style="height:100%; width:${barPct}%; background:var(--accent); border-radius:2px; transition:width 0.2s;"></div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:120px 1fr; gap:10px 20px; font-size:14px; margin-bottom:16px;">
+            <span class="text-muted">Round</span>   <span>${mv.round_number}</span>
+            <span class="text-muted">Order</span>   <span>${mv.order_played}</span>
+            <span class="text-muted">Player</span>  <span style="font-weight:500;">${mv.username} <span class="text-muted small">(seat ${mv.seat_position})</span></span>
+          </div>
+
+          <div class="text-muted small" style="margin-bottom:8px; font-weight:500; text-transform:uppercase; letter-spacing:0.08em;">Tiles Played</div>
+          <div class="tile-list">${tiles || '<span class="text-muted small">No tiles</span>'}</div>
+        </div>`;
+    }
+
+    function nextMove() {
+      if (currentIndex < replayData.moves.length - 1) { currentIndex++; renderReplay(); }
+    }
+    function prevMove() {
+      if (currentIndex > 0) { currentIndex--; renderReplay(); }
+    }
+
+    // Keyboard navigation
+    document.addEventListener("keydown", function(e) {
+      if (!replayData) return;
+      if (e.key === "ArrowRight") nextMove();
+      if (e.key === "ArrowLeft")  prevMove();
+    });
+
+    function exportJSON() {
+      const blob = new Blob([JSON.stringify(replayData, null, 2)], { type: "application/json" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url; a.download = "match_" + gameId + "_replay.json"; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    loadReplay();
+  </script>
 </body>
 </html>
