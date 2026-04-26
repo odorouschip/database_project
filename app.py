@@ -663,6 +663,57 @@ def play_game_screen(game_id):
 
     return render_template("play.html", game_id=game_id, error=None)
 
+
+@app.route('/api/game/<int:game_id>/players', methods=['GET'])
+def get_game_players(game_id):
+    if not logged_in():
+        return jsonify({"status": "error", "message": "Not logged in"}), 401
+
+    player_id = session["player_id"]
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"status": "error", "message": "Database connection failed"}), 500
+
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT gp.seat_position, p.username, gp.player_id
+            FROM Game_Player gp
+            JOIN Player p ON p.player_id = gp.player_id
+            WHERE gp.game_id = %s
+            ORDER BY gp.seat_position
+            """,
+            (game_id,),
+        )
+        rows = cursor.fetchall()
+        if len(rows) != 4:
+            return jsonify(
+                {"status": "error", "message": "Match is not full yet."}
+            ), 400
+
+        my_seat = None
+        for r in rows:
+            if int(r["player_id"]) == int(player_id):
+                my_seat = int(r["seat_position"])
+                break
+        if my_seat is None:
+            return jsonify(
+                {"status": "error", "message": "Not part of this match."}
+            ), 403
+
+        return jsonify({
+            "players": [
+                {"seat": int(r["seat_position"]), "username": r["username"]}
+                for r in rows
+            ],
+            "my_seat": my_seat,
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def _apply_match_completion_effects(cursor, game_id, winning_team_number):
     """
     When a game is marked completed, update Stats (wins, losses, average) and Player.rating

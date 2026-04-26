@@ -2,6 +2,7 @@ import { useReducer, useState, useLayoutEffect, useEffect, useRef } from 'react'
 import { gameReducer, initialState } from './gameReducer';
 import { getLegalDefenders, getWinner } from './gameLogic';
 import { getEmbeddedGameId } from './embeddedGame';
+import { loadGameInfo } from './serverGame';
 import { tryRecordMove } from './serverMoves';
 import { SetupScreen } from './components/SetupScreen';
 import { TransitionScreen } from './components/TransitionScreen';
@@ -32,6 +33,21 @@ export function App() {
     } catch {
       autostartOnce.current = false;
     }
+  }, []);
+
+  // Embedded game: auto-load real player names from server and skip SetupScreen
+  useEffect(() => {
+    if (autostartOnce.current) return;
+    if (getEmbeddedGameId() == null) return;
+    autostartOnce.current = true;
+    void loadGameInfo().then(info => {
+      if (!info) {
+        autostartOnce.current = false;
+        return;
+      }
+      const names = info.players.map(p => p.username) as [string, string, string, string];
+      dispatch({ type: 'START_GAME', payload: { playerNames: names } });
+    });
   }, []);
 
   // When hosted on the play page, record the result as soon as game over is shown
