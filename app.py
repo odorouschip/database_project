@@ -668,6 +668,67 @@ def play_game_screen(game_id):
     return render_template("play.html", game_id=game_id, error=None)
 
 
+@app.route('/api/match/<int:game_id>/moves', methods=['GET'])
+def list_match_moves(game_id):
+    if not logged_in():
+        return jsonify({"status": "error", "message": "Not logged in"}), 401
+
+    try:
+        since = int(request.args.get('since', '0'))
+    except (TypeError, ValueError):
+        since = 0
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"status": "error", "message": "Database connection failed"}), 500
+
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT 1 FROM Game_Player
+            WHERE game_id = %s AND player_id = %s
+            """,
+            (game_id, session["player_id"]),
+        )
+        if not cursor.fetchone():
+            return jsonify(
+                {"status": "error", "message": "Not part of this match."}
+            ), 403
+
+        cursor.execute(
+            """
+            SELECT m.move_id, m.order_played, r.round_number, gp.seat_position
+            FROM Game_Moves gm
+            JOIN Move m ON m.move_id = gm.move_id
+            JOIN Round r ON r.round_id = gm.round_id
+            JOIN Player_Move pm ON pm.move_id = m.move_id
+            JOIN Game_Player gp ON gp.player_id = pm.player_id AND gp.game_id = gm.game_id
+            WHERE gm.game_id = %s AND m.move_id > %s
+            ORDER BY m.move_id ASC
+            """,
+            (game_id, since),
+        )
+        moves = cursor.fetchall()
+        for mv in moves:
+            cursor.execute(
+                """
+                SELECT t.tile_name
+                FROM Tile_Moved tm
+                JOIN Tile t ON t.tile_id = tm.tile_id
+                WHERE tm.move_id = %s
+                ORDER BY t.tile_id ASC
+                """,
+                (mv["move_id"],),
+            )
+            mv["tile_kinds"] = [str(r["tile_name"]).lower() for r in cursor.fetchall()]
+
+        return jsonify({"moves": moves})
+    finally:
+        cursor.close()
+        conn.close()
+
+
 @app.route('/api/game/<int:game_id>/players', methods=['GET'])
 def get_game_players(game_id):
     if not logged_in():

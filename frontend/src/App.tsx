@@ -4,6 +4,8 @@ import { getLegalDefenders, getWinner } from './gameLogic';
 import { getEmbeddedGameId } from './embeddedGame';
 import { loadGameInfo } from './serverGame';
 import { tryRecordMove } from './serverMoves';
+import { fetchNewMoves } from './serverPolling';
+import type { RemoteMove } from './serverPolling';
 import { SetupScreen } from './components/SetupScreen';
 import { TransitionScreen } from './components/TransitionScreen';
 import { PlayerTurnScreen } from './components/PlayerTurnScreen';
@@ -49,6 +51,27 @@ export function App() {
       dispatch({ type: 'START_GAME', payload: { playerNames: names, dealSeed: info.dealSeed } });
     });
   }, []);
+
+  // Track the latest state so the polling effect can read the up-to-date round info.
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+
+  // Poll for moves played by other clients and apply them to local state.
+  const lastMoveIdRef = useRef(0);
+  useEffect(() => {
+    if (getEmbeddedGameId() == null) return;
+    if (state.round == null) return;
+
+    const interval = setInterval(async () => {
+      const moves = await fetchNewMoves(lastMoveIdRef.current);
+      const next = moves[0];
+      if (!next) return;
+      lastMoveIdRef.current = next.move_id;
+      applyRemoteMove(next, stateRef.current, dispatch);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [state.round != null]);
 
   // When hosted on the play page, record the result as soon as game over is shown
   useLayoutEffect(() => {
@@ -281,6 +304,47 @@ export function App() {
     default:
       return null;
   }
+}
+
+type Dispatch = (action: Parameters<typeof gameReducer>[1]) => void;
+
+function applyRemoteMove(
+  mv: RemoteMove,
+  state: ReturnType<typeof gameReducer>,
+  dispatch: Dispatch,
+): void {
+  if (!state.round) return;
+  const seatIndex = (mv.seat_position - 1) as PlayerIndex;
+  if (seatIndex !== state.round.currentPlayerIndex) {
+    console.warn('serverPolling: seat mismatch — expected', state.round.currentPlayerIndex, 'got', seatIndex);
+    return;
+  }
+
+  const hand = state.round.hands[seatIndex] ?? [];
+  const kinds = mv.tile_kinds as TileKind[];
+
+  if (kinds.length === 0) {
+    dispatch({ type: 'PLAYER_PASSED' });
+    return;
+  }
+
+  if (kinds.length === 2) {
+    const k1 = kinds[0]!;
+    const k2 = kinds[1]!;
+    const t1 = hand.find(t => t.kind === k1);
+    if (!t1) { console.warn('serverPolling: no tile of kind', k1); return; }
+    const t2 = hand.find(t => t.id !== t1.id && t.kind === k2);
+    if (!t2) { console.warn('serverPolling: no second tile of kind', k2); return; }
+
+    if (state.round.currentAttack == null) {
+      dispatch({ type: 'ATTACK_PLAYED', payload: { shogunTileId: t1.id, attackTileId: t2.id } });
+    } else {
+      dispatch({ type: 'DEFENSE_PLAYED', payload: { defenseTileId: t1.id, newAttackTileId: t2.id } });
+    }
+    return;
+  }
+
+  console.warn('serverPolling: unsupported tile_kinds count', kinds.length);
 }
 
 export default App;
