@@ -21,6 +21,7 @@ export function App() {
   const [matchSaved, setMatchSaved] = useState(true);
   const [savingResult, setSavingResult] = useState(false);
   const autostartOnce = useRef(false);
+  const mySeatRef = useRef<number | null>(null);
 
   // Rematch: continue with same four names (parent navigates to /play/<newId>)
   useEffect(() => {
@@ -47,6 +48,7 @@ export function App() {
         autostartOnce.current = false;
         return;
       }
+      mySeatRef.current = info.mySeat;
       const names = info.players.map(p => p.username) as [string, string, string, string];
       dispatch({ type: 'START_GAME', payload: { playerNames: names, dealSeed: info.dealSeed } });
     });
@@ -55,6 +57,14 @@ export function App() {
   // Track the latest state so the polling effect can read the up-to-date round info.
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
+
+  // In multiplayer, every player has their own browser, so the "pass the device"
+  // transition screen makes no sense. Auto-confirm it.
+  useEffect(() => {
+    if (getEmbeddedGameId() == null) return;
+    if (state.screen !== 'transition') return;
+    dispatch({ type: 'TRANSITION_CONFIRMED' });
+  }, [state.screen]);
 
   // Poll for moves played by other clients and apply them to local state.
   const lastMoveIdRef = useRef(0);
@@ -152,6 +162,24 @@ export function App() {
       const legalDefenders = round.currentAttack
         ? getLegalDefenders(hand, round.currentAttack.attackTile)
         : [];
+
+      // Multiplayer: when it's not my turn, show a spectator view instead of the
+      // action UI. mySeatRef is 1-based, currentIndex is 0-based.
+      const mySeat = mySeatRef.current;
+      if (mySeat != null && (mySeat - 1) !== currentIndex) {
+        return (
+          <div className="screen transition-screen">
+            <div className="transition-inner">
+              <p className="transition-instruction">Waiting for</p>
+              <h2 className="transition-player-name">{currentPlayer.name}</h2>
+              <div className="transition-seat">Seat {currentIndex + 1}</div>
+              <p style={{ marginTop: 16, opacity: 0.6 }}>
+                Score — Team A: {state.teamScores.A} · Team B: {state.teamScores.B}
+              </p>
+            </div>
+          </div>
+        );
+      }
 
       return (
         <PlayerTurnScreen
