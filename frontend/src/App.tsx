@@ -46,7 +46,7 @@ export function App() {
         return;
       }
       const names = info.players.map(p => p.username) as [string, string, string, string];
-      dispatch({ type: 'START_GAME', payload: { playerNames: names } });
+      dispatch({ type: 'START_GAME', payload: { playerNames: names, dealSeed: info.dealSeed } });
     });
   }, []);
 

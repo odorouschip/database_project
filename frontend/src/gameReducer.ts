@@ -7,7 +7,7 @@ import {
 } from './gameLogic';
 
 export type GameAction =
-  | { type: 'START_GAME'; payload: { playerNames: [string, string, string, string] } }
+  | { type: 'START_GAME'; payload: { playerNames: [string, string, string, string]; dealSeed?: number | null } }
   | { type: 'TRANSITION_CONFIRMED' }
   | { type: 'ATTACK_PLAYED'; payload: { shogunTileId: number; attackTileId: number } }
   | { type: 'DEFENSE_PLAYED'; payload: { defenseTileId: number; newAttackTileId: number } }
@@ -24,6 +24,7 @@ export const initialState: GameState = {
   teamScores: { A: 0, B: 0 },
   round: null,
   transition: null,
+  dealSeed: null,
 };
 
 function afterDeal(state: GameState, round: RoundState): GameState {
@@ -45,8 +46,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         name,
         teamId: getTeamId(i as PlayerIndex),
       })) as GameState['players'];
-      const round = initRound(1, 0);
-      return afterDeal({ ...state, players, teamScores: { A: 0, B: 0 } }, round);
+      const dealSeed = action.payload.dealSeed ?? null;
+      const round = initRound(1, 0, dealSeed);
+      return afterDeal({ ...state, players, teamScores: { A: 0, B: 0 }, dealSeed }, round);
     }
 
     case 'TRANSITION_CONFIRMED': {
@@ -209,7 +211,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       // Redeal -> same dealer, same round number
-      const newRound = initRound(round.roundNumber, round.dealerIndex);
+      const newRound = initRound(round.roundNumber, round.dealerIndex, state.dealSeed);
       return afterDeal(state, newRound);
     }
 
@@ -219,7 +221,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
       const newDealerIndex = nextPlayer(state.round!.dealerIndex);
       const newRoundNumber = (state.round?.roundNumber ?? 0) + 1;
-      const newRound = initRound(newRoundNumber, newDealerIndex);
+      const newRound = initRound(newRoundNumber, newDealerIndex, state.dealSeed);
       return afterDeal(state, newRound);
     }
 
@@ -233,7 +235,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         name,
         teamId: getTeamId(i as PlayerIndex),
       })) as GameState['players'];
-      const round = initRound(1, 0);
+      const round = initRound(1, 0, state.dealSeed);
       return afterDeal({ ...state, players, teamScores: { A: 0, B: 0 } }, round);
     }
 

@@ -37,6 +37,29 @@ export function shuffleDeck(deck: Tile[]): Tile[] {
   return arr;
 }
 
+// Mulberry32: tiny deterministic PRNG that takes a 32-bit seed.
+// Same seed → same number sequence on every device.
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function shuffleDeckSeeded(deck: Tile[], seed: number): Tile[] {
+  const arr = [...deck];
+  const rand = mulberry32(seed);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
+  }
+  return arr;
+}
+
 export function dealHands(deck: Tile[]): Record<PlayerIndex, Tile[]> {
   if (deck.length !== 32) throw new Error(`Expected 32 tiles, got ${deck.length}`);
   return {
@@ -133,8 +156,12 @@ function emptyBoardHistory(): Record<PlayerIndex, import('./types').PlayerBoardR
   return { 0: { attackTiles: [], defenseTiles: [] }, 1: { attackTiles: [], defenseTiles: [] }, 2: { attackTiles: [], defenseTiles: [] }, 3: { attackTiles: [], defenseTiles: [] } };
 }
 
-export function initRound(roundNumber: number, dealerIndex: PlayerIndex): RoundState {
-  const deck = shuffleDeck(buildDeck());
+export function initRound(roundNumber: number, dealerIndex: PlayerIndex, dealSeed?: number | null): RoundState {
+  // If a seed is supplied, derive a per-round seed so each round still gets a different shuffle
+  // but every client agrees because they all start from the same base seed.
+  const deck = (dealSeed != null)
+    ? shuffleDeckSeeded(buildDeck(), (dealSeed ^ (roundNumber * 0x9e3779b1)) >>> 0)
+    : shuffleDeck(buildDeck());
   const hands = dealHands(deck);
   const specialPawnTrigger = checkSpecialPawnHands(hands);
 

@@ -61,4 +61,5 @@ export interface GameState {
   teamScores: { A: number; B: number };
   round: RoundState | null;
   transition: { nextPlayerIndex: PlayerIndex; afterScreen: 'player_turn' | 'special_pawn' } | null;
+  dealSeed: number | null;
 }

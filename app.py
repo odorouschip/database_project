@@ -598,6 +598,10 @@ def start_game():
             "INSERT INTO Team (game_id, team_number, score) VALUES (%s, 1, 0), (%s, 2, 0)",
             (game_id, game_id),
         )
+        cursor.execute(
+            "UPDATE Game SET deal_seed = FLOOR(RAND() * 4294967295) WHERE game_id = %s AND deal_seed IS NULL",
+            (game_id,),
+        )
         conn.commit()
         return jsonify({
             "status": "success",
@@ -702,12 +706,20 @@ def get_game_players(game_id):
                 {"status": "error", "message": "Not part of this match."}
             ), 403
 
+        cursor.execute(
+            "SELECT deal_seed FROM Game WHERE game_id = %s",
+            (game_id,),
+        )
+        seed_row = cursor.fetchone()
+        deal_seed = int(seed_row["deal_seed"]) if seed_row and seed_row.get("deal_seed") is not None else None
+
         return jsonify({
             "players": [
                 {"seat": int(r["seat_position"]), "username": r["username"]}
                 for r in rows
             ],
             "my_seat": my_seat,
+            "deal_seed": deal_seed,
         })
     finally:
         cursor.close()
