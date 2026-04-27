@@ -18,14 +18,14 @@ if not app.secret_key:
 def get_db_connection():
     try:
         connection = mysql.connector.connect(
-            unix_socket="/cloudsql/cs4750db-490221:us-east1:YOUR-INSTANCE-NAME",
-            user="app_user",
-            password="app_password",
-            database="goita_db"
+            host=os.getenv("DB_HOST", "127.0.0.1"),  # Defaults to localhost for your laptop
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            database=os.getenv("DB_NAME")
         )
         return connection
     except Exception as e:
-        print(f"CRITICAL DB ERROR: {e}")
+        print(f"Error connecting to MySQL: {e}")
         return None
 
 def logged_in():
