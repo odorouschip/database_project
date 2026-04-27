@@ -17,12 +17,24 @@ if not app.secret_key:
 
 def get_db_connection():
     try:
-        connection = mysql.connector.connect(
-            host=os.getenv("DB_HOST"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            database=os.getenv("DB_NAME")
-        )
+        db_host = os.getenv("DB_HOST")
+        
+        # If running on App Engine, use the Unix Socket
+        if db_host and db_host.startswith("/cloudsql/"):
+            connection = mysql.connector.connect(
+                unix_socket=db_host,
+                user=os.getenv("DB_USER"),
+                password=os.getenv("DB_PASSWORD"),
+                database=os.getenv("DB_NAME")
+            )
+        # If running locally, use the IP Address
+        else:
+            connection = mysql.connector.connect(
+                host=db_host,
+                user=os.getenv("DB_USER"),
+                password=os.getenv("DB_PASSWORD"),
+                database=os.getenv("DB_NAME")
+            )
         return connection
     except Error as e:
         print(f"Error connecting to MySQL: {e}")
