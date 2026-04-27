@@ -1,0 +1,11 @@
+runtime: python39
+entrypoint: gunicorn -b :$PORT app:app
+
+# These replace your .env file in the cloud
+env_variables:
+  DB_HOST: "127.0.0.1" 
+  DB_USER: "app_user"
+  DB_PASSWORD: "app_password"
+  DB_NAME: "goita_db"
+  CLOUD_SQL_CONNECTION_NAME: "cs4750db-490221:us-central1:goita-online"
+  FLASK_SECRET_KEY: "something-very-secret"
