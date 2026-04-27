@@ -2,7 +2,7 @@ runtime: python312
 
 # These replace your .env file in the cloud
 env_variables:
-  DB_HOST: "127.0.0.1" # App Engine uses a proxy to talk to SQL
+  DB_HOST: "/cloudsql/cs4750db-490221:us-central1:goita-online"
   DB_USER: "app_user"
   DB_PASSWORD: "app_password"
   DB_NAME: "goita_db"
