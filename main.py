@@ -11,33 +11,21 @@ from flask import Flask, request, jsonify, render_template, redirect, url_for, s
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY")
+app.secret_key = "goita-super-secret-key-2026-heheheha"
 if not app.secret_key:
     raise RuntimeError("FLASK_SECRET_KEY not set. please set in .env for session control")
 
 def get_db_connection():
     try:
-        db_host = os.getenv("DB_HOST")
-        
-        # If running on App Engine, use the Unix Socket
-        if db_host and db_host.startswith("/cloudsql/"):
-            connection = mysql.connector.connect(
-                unix_socket=db_host,
-                user=os.getenv("DB_USER"),
-                password=os.getenv("DB_PASSWORD"),
-                database=os.getenv("DB_NAME")
-            )
-        # If running locally, use the IP Address
-        else:
-            connection = mysql.connector.connect(
-                host=db_host,
-                user=os.getenv("DB_USER"),
-                password=os.getenv("DB_PASSWORD"),
-                database=os.getenv("DB_NAME")
-            )
+        connection = mysql.connector.connect(
+            unix_socket="/cloudsql/cs4750db-490221:us-east1:YOUR-INSTANCE-NAME",
+            user="app_user",
+            password="app_password",
+            database="goita_db"
+        )
         return connection
-    except Error as e:
-        print(f"Error connecting to MySQL: {e}")
+    except Exception as e:
+        print(f"CRITICAL DB ERROR: {e}")
         return None
 
 def logged_in():
