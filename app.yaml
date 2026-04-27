@@ -1,5 +1,4 @@
 runtime: python312
-entrypoint: gunicorn -b :$PORT app:app
 
 # These replace your .env file in the cloud
 env_variables:
