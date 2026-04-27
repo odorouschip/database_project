@@ -4,7 +4,7 @@ import { getLegalDefenders, getWinner } from './gameLogic';
 import { getEmbeddedGameId } from './embeddedGame';
 import { loadGameInfo } from './serverGame';
 import { tryRecordMove } from './serverMoves';
-import { fetchNewMoves } from './serverPolling';
+import { pollMatchState, postRoundAdvance } from './serverPolling';
 import type { RemoteMove } from './serverPolling';
 import { SetupScreen } from './components/SetupScreen';
 import { TransitionScreen } from './components/TransitionScreen';
@@ -73,7 +73,15 @@ export function App() {
     if (state.round == null) return;
 
     const interval = setInterval(async () => {
-      const moves = await fetchNewMoves(lastMoveIdRef.current);
+      const { moves, currentRound } = await pollMatchState(lastMoveIdRef.current);
+
+      // Round-advance broadcast: if the server is on a later round than us, catch up first.
+      const localRound = stateRef.current.round?.roundNumber ?? 1;
+      if (currentRound > localRound) {
+        dispatch({ type: 'NEXT_ROUND' });
+        return;
+      }
+
       const next = moves[0];
       if (!next) return;
       lastMoveIdRef.current = next.move_id;
@@ -281,7 +289,12 @@ export function App() {
           teamScores={state.teamScores}
           players={state.players!}
           roundNumber={round.roundNumber}
-          onNextRound={() => dispatch({ type: 'NEXT_ROUND' })}
+          onNextRound={() => {
+            dispatch({ type: 'NEXT_ROUND' });
+            if (getEmbeddedGameId() != null) {
+              void postRoundAdvance(round.roundNumber);
+            }
+          }}
         />
       );
     }

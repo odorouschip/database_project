@@ -40,7 +40,8 @@ CREATE TABLE Game (
     status VARCHAR(20) NOT NULL,
     target_score INT NOT NULL,
     winning_team_number INT,
-    deal_seed INT UNSIGNED
+    deal_seed INT UNSIGNED,
+    current_round INT NOT NULL DEFAULT 1
 );
 
 CREATE TABLE Round (

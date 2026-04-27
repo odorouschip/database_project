@@ -697,6 +697,13 @@ def list_match_moves(game_id):
             ), 403
 
         cursor.execute(
+            "SELECT current_round FROM Game WHERE game_id = %s",
+            (game_id,),
+        )
+        crow = cursor.fetchone()
+        current_round = int(crow["current_round"]) if crow and crow.get("current_round") is not None else 1
+
+        cursor.execute(
             """
             SELECT m.move_id, m.order_played, r.round_number, gp.seat_position
             FROM Game_Moves gm
@@ -723,7 +730,57 @@ def list_match_moves(game_id):
             )
             mv["tile_kinds"] = [str(r["tile_name"]).lower() for r in cursor.fetchall()]
 
-        return jsonify({"moves": moves})
+        return jsonify({"moves": moves, "current_round": current_round})
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@app.route('/api/match/<int:game_id>/round/advance', methods=['POST'])
+def advance_round(game_id):
+    if not logged_in():
+        return jsonify({"status": "error", "message": "Not logged in"}), 401
+
+    data = request.get_json(silent=True) or {}
+    try:
+        from_round = int(data.get("from_round"))
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "from_round is required."}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"status": "error", "message": "Database connection failed"}), 500
+
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT 1 FROM Game_Player
+            WHERE game_id = %s AND player_id = %s
+            """,
+            (game_id, session["player_id"]),
+        )
+        if not cursor.fetchone():
+            return jsonify(
+                {"status": "error", "message": "Not part of this match."}
+            ), 403
+
+        cursor.execute(
+            """
+            UPDATE Game SET current_round = current_round + 1
+            WHERE game_id = %s AND current_round = %s
+            """,
+            (game_id, from_round),
+        )
+        conn.commit()
+
+        cursor.execute(
+            "SELECT current_round FROM Game WHERE game_id = %s",
+            (game_id,),
+        )
+        crow = cursor.fetchone()
+        current_round = int(crow["current_round"]) if crow else from_round
+        return jsonify({"status": "success", "current_round": current_round})
     finally:
         cursor.close()
         conn.close()
